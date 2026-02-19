@@ -1,0 +1,121 @@
+{
+    "users": [
+        "id",
+        "name",
+        "email",
+        "password",
+        "phone",
+        "role",
+        "banned_until",
+        "ban_reason",
+        "preferred_language",
+        "emergency_contact_name",
+        "emergency_contact_phone",
+        "voice_enabled",
+        "created_at",
+        "ai_enabled",
+        "voice_reminders_enabled",
+        "preferred_voice_uri",
+        "ai_always_active",
+        "ai_voice_model",
+        "ai_voice_pitch",
+        "ai_voice_clarity",
+        "avatar_url"
+    ],
+    "channels": [
+        "id",
+        "name",
+        "type",
+        "is_protected",
+        "read_only",
+        "created_at"
+    ],
+    "medicines": [
+        "id",
+        "user_id",
+        "name",
+        "dosage",
+        "time",
+        "after_meal",
+        "taken",
+        "end_date",
+        "created_at",
+        "last_taken_at",
+        "frequency"
+    ],
+    "medicine_history": [
+        "id",
+        "user_id",
+        "medicine_id",
+        "medicine_name",
+        "status",
+        "taken_at"
+    ],
+    "vitals": [
+        "id",
+        "user_id",
+        "bp_systolic",
+        "bp_diastolic",
+        "sugar_level",
+        "heart_rate",
+        "notes",
+        "recorded_at"
+    ],
+    "appointments": [
+        "id",
+        "user_id",
+        "doctor_name",
+        "date",
+        "time",
+        "reason",
+        "created_at"
+    ],
+    "chat_messages": [
+        "id",
+        "user_id",
+        "message",
+        "channel",
+        "reply_to_id",
+        "attachment_url",
+        "attachment_type",
+        "timestamp",
+        "is_deleted"
+    ],
+    "dm_messages": [
+        "id",
+        "sender_id",
+        "receiver_id",
+        "message",
+        "attachment_url",
+        "attachment_type",
+        "read",
+        "timestamp",
+        "is_deleted"
+    ],
+    "dm_blocks": [
+        "user_id",
+        "blocked_id"
+    ],
+    "channel_roles": [
+        "id",
+        "channel_id",
+        "user_id",
+        "role",
+        "created_at"
+    ],
+    "user_locations": [
+        "user_id",
+        "latitude",
+        "longitude",
+        "updated_at",
+        "status"
+    ],
+    "audit_logs": [
+        "id",
+        "user_id",
+        "action",
+        "resource",
+        "details",
+        "timestamp"
+    ]
+}

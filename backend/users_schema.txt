@@ -1,0 +1,15 @@
+CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE,
+                password TEXT DEFAULT 'password',
+                phone TEXT,
+                role TEXT DEFAULT 'user',
+                banned_until TEXT,
+                ban_reason TEXT,
+                preferred_language TEXT DEFAULT 'en',
+                emergency_contact_name TEXT,
+                emergency_contact_phone TEXT,
+                voice_enabled INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            , ai_enabled INTEGER DEFAULT 1, voice_reminders_enabled INTEGER DEFAULT 1, preferred_voice_uri TEXT, ai_always_active INTEGER DEFAULT 1, ai_voice_model TEXT DEFAULT 'edge-neural', ai_voice_pitch REAL DEFAULT 1.0, ai_voice_clarity REAL DEFAULT 1.0, avatar_url TEXT)

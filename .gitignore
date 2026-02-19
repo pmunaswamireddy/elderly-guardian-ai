@@ -1,0 +1,57 @@
+# Node.js
+node_modules/
+dist/
+build/
+frontend/dist/
+frontend/.vite/
+.env
+.env.*
+*.env
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+.pytest_cache/
+*.egg-info/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Project Specific
+backend_err.txt
+backend_start.log
+ocr_debug.json
+ocr_debug.log
+frontend/public/avatars/
+backend/uploads/
+
+# Temp / debug scripts
+backend/check_*.py
+backend/test_*.py
+backend/fix_*.py
+backend/update_*.py
+backend/check_output.txt
+backend/sync_test*.txt
+
+# Media
+*.mp3
+*.mp4
+*.wav

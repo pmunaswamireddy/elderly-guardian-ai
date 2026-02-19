@@ -1,0 +1,1592 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { readStoredUser, setStoredUser, clearStoredUser, setStoredUserId } from './storagePolicy';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Settings,
+  Bell,
+  Calendar,
+  Pill,
+  Activity,
+  PhoneCall,
+  Camera,
+  Heart,
+  Brain,
+  LogOut,
+  BarChart2,
+  BarChart3,
+  FileText,
+  Users,
+  Database,
+  Lock,
+  Shield,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  AlertCircle,
+  ChevronRight,
+  Sun,
+  Moon,
+  Eye,
+  EyeOff,
+  MessageSquare,
+  ImageIcon,
+  Monitor,
+  Layout
+} from 'lucide-react';
+import { cn } from './utils/cn';
+import { UIAutomation } from './utils/uiAutomation';
+
+import PrescriptionUploader from './components/PrescriptionUploader';
+import HealthReport from './components/HealthReport';
+import VoiceBooking from './components/VoiceBooking';
+import FacialAnalysis from './components/FacialAnalysis';
+import DiseasePrediction from './components/DiseasePrediction';
+import { SettingsModal } from './components/SettingsModal';
+import { NotificationDropdown } from './components/NotificationDropdown';
+import { ConfirmationModal } from './components/ConfirmationModal';
+import VitalsMonitor from './components/VitalsMonitor';
+import VitalsInput from './components/VitalsInput';
+import { MedicineEntryModal } from './components/MedicineEntryModal';
+import { MedicineList } from './components/MedicineList';
+import { NetworkHelpModal } from './components/NetworkHelpModal';
+import { MedicineReminderAlert } from './components/MedicineReminderAlert';
+import { AIAgentVisualizer } from './components/AIAgentVisualizer';
+import LocationTracker from './components/LocationTracker';
+
+import AdminOverview from './components/admin/AdminOverview';
+import ContentManager from './components/admin/ContentManager';
+import MediaLibrary from './components/admin/MediaLibrary';
+import SystemSettings from './components/admin/SystemSettings';
+import AuditLogs from './components/admin/AuditLogs';
+import UserManagement from './components/admin/UserManagement';
+import CommunityChat from './components/CommunityChat';
+import SystemMonitor from './components/admin/SystemMonitor';
+import DatabaseManager from './components/admin/DatabaseManager';
+
+import { API_BASE_URL } from './config';
+import type { SupportedLang } from './types/languages';
+
+declare global {
+  interface Window {
+    currentRecognition: any;
+    forceAIResponse: boolean;
+    speechRestartTimer: any;
+    onAudioEnded?: () => void;
+    micLock: boolean; // Add micLock to global window
+  }
+} window.micLock = false; // Initialize micLock
+
+
+// --- Localization System ---
+const translations: Record<string, Record<string, string>> = {
+  en: {
+    'welcome_guardian': 'Welcome Back, Guardian.',
+    'welcome_sub': 'Your health isn\'t just a number. It\'s our priority.',
+    'hello': 'Hello',
+    'feeling_today': 'How are you feeling today?',
+    'nav_health': 'Health',
+    'nav_meds': 'Meds',
+    'nav_chat': 'Community',
+    'nav_stats': 'Stats',
+    'nav_docs': 'Visits',
+    'nav_face': 'Scan',
+    'nav_predict': 'Predict',
+    'nav_admin': 'Admin',
+    'sos': 'Emergency SOS',
+    'call': 'Call',
+    'add_med': 'Add New Medicine',
+    'thinking': 'Thinking...',
+    'stop_assistant': 'Stopping assistant',
+    'vitals_logged': 'Vitals Logged Successfully'
+  },
+  hi: {
+    'welcome_guardian': 'वापसी पर स्वागत है, रक्षक।',
+    'welcome_sub': 'आपका स्वास्थ्य सिर्फ एक नंबर नहीं है। यह हमारी प्राथमिकता है।',
+    'hello': 'नमस्ते',
+    'feeling_today': 'आज आप कैसा महसूस कर रहे हैं?',
+    'nav_health': 'स्वास्थ्य',
+    'nav_meds': 'दवाएं',
+    'nav_chat': 'समुदाय',
+    'nav_stats': 'आंकड़े',
+    'nav_docs': 'विजिट',
+    'nav_face': 'स्कैन',
+    'nav_predict': 'अनुमान',
+    'nav_admin': 'एडमिन',
+    'sos': 'आपातकालीन सहायता',
+    'call': 'कॉल करें',
+    'add_med': 'नई दवा जोड़ें',
+    'thinking': 'सोच रहा हूँ...',
+    'stop_assistant': 'सहायक को रोक रहा हूँ',
+    'vitals_logged': 'वाइबल्स सफलतापूर्वक लॉग किए गए'
+  },
+  te: {
+    'welcome_guardian': 'తిరిగి స్వాగతం, గార్డియన్.',
+    'welcome_sub': 'మీ ఆరోగ్యం కేవలం ఒక సంఖ్య కాదు. అది మా ప్రాధాన్యత.',
+    'hello': 'నమస్కారం',
+    'feeling_today': 'ఈ రోజు మీరు ఎలా ఉన్నారు?',
+    'nav_health': 'ఆరోగ్యం',
+    'nav_meds': 'మందులు',
+    'nav_chat': 'కమ్యూనిటీ',
+    'nav_stats': 'గణాంకాలు',
+    'nav_docs': 'సందర్శనలు',
+    'nav_face': 'స్కాన్',
+    'nav_predict': 'అంచనా',
+    'nav_admin': 'అడ్మిన్',
+    'sos': 'అత్యవసర SOS',
+    'call': 'కాల్ చేయండి',
+    'add_med': 'కొత్త మందును జోడించండి',
+    'thinking': 'ఆలోచిస్తున్నాను...',
+    'stop_assistant': 'అసిస్టెంట్‌ను ఆపుతున్నాను',
+    'vitals_logged': 'వైటల్స్ విజయవంతంగా నమోదయ్యాయి'
+  },
+  ta: {
+    'welcome_guardian': 'மீண்டும் வருக, பாதுகாவலரே.',
+    'welcome_sub': 'உங்கள் ஆரோக்கியம் வெறும் எண் அல்ல. அது எங்கள் முன்னுரிமை.',
+    'hello': 'வணக்கம்',
+    'feeling_today': 'இன்று நீங்கள் எப்படி உணர்கிறீர்கள்?',
+    'nav_health': 'ஆரோக்கியம்',
+    'nav_meds': 'மருந்துகள்',
+    'nav_chat': 'சமூகம்',
+    'nav_stats': 'புள்ளிவிவரம்',
+    'nav_docs': 'வருகைகள்',
+    'nav_face': 'ஸ்கேன்',
+    'nav_predict': 'கணிப்பு',
+    'nav_admin': 'நிர்வாகம்',
+    'sos': 'அவசர SOS',
+    'call': 'அழைக்கவும்',
+    'add_med': 'புதிய மருந்தைச் சேர்க்கவும்',
+    'thinking': 'சிந்திக்கிறேன்...',
+    'stop_assistant': 'உதவியாளரை நிறுத்துகிறேன்',
+    'vitals_logged': 'உடல்நிலை பதிவு செய்யப்பட்டது'
+  },
+  bn: {
+    'welcome_guardian': 'স্বাগতম, গার্ডিয়ান।',
+    'welcome_sub': 'আপনার স্বাস্থ্য শুধু একটি সংখ্যা নয়। এটি আমাদের অগ্রাধিকার।',
+    'hello': 'নমস্কার',
+    'feeling_today': 'আজ আপনি কেমন বোধ করছেন?',
+    'nav_health': 'স্বাস্থ্য',
+    'nav_meds': 'ওষুধ',
+    'nav_chat': 'কমিউনিটি',
+    'nav_stats': 'পরিসংখ্যান',
+    'nav_docs': 'ভিসিট',
+    'nav_face': 'স্ক্যান',
+    'nav_predict': 'পূর্বাভাস',
+    'nav_admin': 'অ্যাডমিন',
+    'sos': 'জরুরী SOS',
+    'call': 'কল করুন',
+    'add_med': 'নতুন ওষুধ যোগ করুন',
+    'thinking': 'চিন্তা করছি...',
+    'stop_assistant': 'অ্যাসিস্ট্যান্ট বন্ধ করছি',
+    'vitals_logged': 'ভাইটাল সফলভাবে লগ করা হয়েছে'
+  },
+  mr: {
+    'welcome_guardian': 'पुन्हा स्वागत आहे, गार्डियन.',
+    'welcome_sub': 'तुमचे आरोग्य केवळ एक संख्या नाही. ती आमची प्राथमिकता आहे।',
+    'hello': 'नमस्कार',
+    'feeling_today': 'आज तुम्हाला कसे वाटत आहे?',
+    'nav_health': 'आरोग्य',
+    'nav_meds': 'औषधे',
+    'nav_chat': 'समुदाय',
+    'nav_stats': 'सांख्यिकी',
+    'nav_docs': 'भेटी',
+    'nav_face': 'स्कॅन',
+    'nav_predict': 'अंदाज',
+    'nav_admin': 'admin',
+    'sos': 'आणीबाणी SOS',
+    'call': 'कॉल करा',
+    'add_med': 'नवीन औषध जोडा',
+    'thinking': 'विचार करत आहे...',
+    'stop_assistant': 'सहाय्यक थांबवत आहे',
+    'vitals_logged': 'वाइटल्स यशस्वीरित्या नोंदवले'
+  },
+  gu: {
+    'welcome_guardian': 'સ્વાગત છે, ગાર્ડિયન.',
+    'welcome_sub': 'તમારું સ્વાસ્થ્ય ફક્ત એક સંખ્યા નથી. તે અમારી પ્રાથમિકતા છે.',
+    'hello': 'નમસ્તે',
+    'feeling_today': 'આજે તમે કેવું અનુભવી રહ્યા છો?',
+    'nav_health': 'સ્વાસ્થ્ય',
+    'nav_meds': 'દવાઓ',
+    'nav_chat': 'સમુદાય',
+    'nav_stats': 'આંકડા',
+    'nav_docs': 'મુલાકાતો',
+    'nav_face': 'સ્કેન',
+    'nav_predict': 'અનુમાન',
+    'nav_admin': 'એડમિન',
+    'sos': 'ઇમરજન્સી SOS',
+    'call': 'કોલ કરો',
+    'add_med': 'નવી દવા ઉમેરો',
+    'thinking': 'વિચારી રહ્યો છું...',
+    'stop_assistant': 'સહાયક રોકી રહ્યો છું',
+    'vitals_logged': 'વાઇટલ્સ સફળતાપૂર્વક લોગ થયા'
+  },
+  kn: {
+    'welcome_guardian': 'ಸ್ವಾಗತ, ಗಾರ್ಡಿಯನ್.',
+    'welcome_sub': 'ನಿಮ್ಮ ಆರೋಗ್ಯ ಕೇವಲ ಒಂದು ಸಂಖ್ಯೆಯಲ್ಲ. ಇದು ನಮ್ಮ ಆದ್ಯತೆ.',
+    'hello': 'ನಮಸ್ತೆ',
+    'feeling_today': 'ಇಂದು ನೀವು ಹೇಗೆ ಭಾವಿಸುತ್ತಿದ್ದೀರಿ?',
+    'nav_health': 'ಆರೋಗ್ಯ',
+    'nav_meds': 'ಔಷಧಿಗಳು',
+    'nav_chat': 'ಸಮುದಾಯ',
+    'nav_stats': 'ಅಂಕಿಅಂಶ',
+    'nav_docs': 'ಭೇಟಿಗಳು',
+    'nav_face': 'ಸ್ಕ್ಯಾನ್',
+    'nav_predict': 'ಮುನ್ಸೂಚನೆ',
+    'nav_admin': 'ಅಡ್ಮಿನ್',
+    'sos': 'ತುರ್ತು SOS',
+    'call': 'ಕರೆ ಮಾಡಿ',
+    'add_med': 'ಹೊಸ ಔಷಧಿ ಸೇರಿಸಿ',
+    'thinking': 'ಯೋಚಿಸುತ್ತಿದ್ದೇನೆ...',
+    'stop_assistant': 'ಸಹಾಯಕನನ್ನು ನಿಲ್ಲಿಸುತ್ತಿದ್ದೇನೆ',
+    'vitals_logged': 'ವೈಟಲ್ಸ್ ಯಶಸ್ವಿಯಾಗಿ ದಾಖಲಿಸಲಾಗಿದೆ'
+  },
+  ml: {
+    'welcome_guardian': 'തിരികെ സ്വാഗതം, ഗാർഡിയൻ.',
+    'welcome_sub': 'നിങ്ങളുടെ ആരോഗ്യം വെറുമൊരു സംഖ്യയല്ല. അത് ഞങ്ങളുടെ മുൻഗണനയാണ്.',
+    'hello': 'നമസ്കാരം',
+    'feeling_today': 'ഇന്ന് നിങ്ങൾക്ക് എങ്ങനെയുണ്ട്?',
+    'nav_health': 'ആരോഗ്യം',
+    'nav_meds': 'മരുന്നുകൾ',
+    'nav_chat': 'കമ്മ്യൂണിറ്റി',
+    'nav_stats': 'സ്ഥിതിവിവരക്കണക്കുകൾ',
+    'nav_docs': 'സന്ദർശനങ്ങൾ',
+    'nav_face': 'സ്കാൻ',
+    'nav_predict': 'പ്രവചനം',
+    'nav_admin': 'അഡ്മിൻ',
+    'sos': 'അടിയന്തിര SOS',
+    'call': 'വിളിക്കുക',
+    'add_med': 'പുതിയ മരുന്ന് ചേർക്കുക',
+    'thinking': 'ചിന്തിക്കുന്നു...',
+    'stop_assistant': 'അസിസ്റ്റന്റിനെ നിർത്തുന്നു',
+    'vitals_logged': 'വൈറ്റലുകൾ വിജയകരമായി രേഖപ്പെടുത്തി'
+  },
+  pa: {
+    'welcome_guardian': 'ਜੀ ਆਇਆਂ ਨੂੰ, ਗਾਰਡੀਅਨ।',
+    'welcome_sub': 'ਤੁਹਾਡੀ ਸਿਹਤ ਸਿਰਫ਼ ਇਕ ਨੰਬਰ ਨਹੀਂ ਹੈ। ਇਹ ਸਾਡੀ ਪਹਿਲ ਹੈ।',
+    'hello': 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ',
+    'feeling_today': 'ਅੱਜ ਤੁਸੀਂ ਕਿਵੇਂ ਮਹਿਸੂਸ ਕਰ ਰਹੇ ਹੋ?',
+    'nav_health': 'ਸਿਹਤ',
+    'nav_meds': 'ਦਵਾਈਆਂ',
+    'nav_chat': 'ਕਮਿਊਨਿਟੀ',
+    'nav_stats': 'ਅੰਕੜੇ',
+    'nav_docs': 'ਮੁਲਾਕਾਤਾਂ',
+    'nav_face': 'ਸਕੈਨ',
+    'nav_predict': 'ਭਵਿੱਖਬਾਣੀ',
+    'nav_admin': 'ਐਡਮਿਨ',
+    'sos': 'ਐਮਰਜੈਂਸੀ SOS',
+    'call': 'ਕਾਲ ਕਰੋ',
+    'add_med': 'ਨਵੀਂ ਦਵਾਈ ਸ਼ਾਮਲ ਕਰੋ',
+    'thinking': 'ਸੋਚ ਰਿਹਾ ਹਾਂ...',
+    'stop_assistant': 'ਸਹਾਇਕ ਨੂੰ ਰੋਕ ਰਿਹਾ ਹਾਂ',
+    'vitals_logged': 'ਵਾਈਟਲਸ ਸਫਲਤਾਪੂਰਵਕ ਦਰਜ ਕੀਤੇ ਗਏ'
+  },
+  ur: {
+    'welcome_guardian': 'خوش آمدید، گارڈین۔',
+    'welcome_sub': 'آپ کی صحت محض ایک عدد نہیں ہے۔ یہ ہماری ترجیح ہے۔',
+    'hello': 'ہیلو',
+    'feeling_today': 'آج آپ کیسا محسوس کر رہے ہیں؟',
+    'nav_health': 'صحت',
+    'nav_meds': 'ادویات',
+    'nav_chat': 'کمیونٹی',
+    'nav_stats': 'اعداد و شمار',
+    'nav_docs': 'ملاقاتیں',
+    'nav_face': 'اسکین',
+    'nav_predict': 'پیش گوئی',
+    'nav_admin': 'ایڈمن',
+    'sos': 'ہنگامی SOS',
+    'call': 'کال کریں',
+    'add_med': 'نئی دوا شامل کریں',
+    'thinking': 'سوچ رہا ہوں...',
+    'stop_assistant': 'اسسٹنٹ کو روک رہا ہوں',
+    'vitals_logged': 'وائٹلز کامیابی سے درج ہو گئے'
+  },
+  or: {
+    'welcome_guardian': 'ସ୍ୱାଗତମ୍, ଗାର୍ଡିଆନ୍‌।',
+    'welcome_sub': 'ଆପଣଙ୍କ ସ୍ୱାସ୍ଥ୍ୟ କେବଳ ଏକ ସଂଖ୍ୟା ନୁହେଁ। ଏହା ଆମର ପ୍ରାଥମିକତା।',
+    'hello': 'ନମସ୍କାର',
+    'feeling_today': 'ଆଜି ଆପଣ କେମିତି ଅନୁଭବ କରୁଛନ୍ତି?',
+    'nav_health': 'ସ୍ୱାସ୍ଥ୍ୟ',
+    'nav_meds': 'ଔଷଧ',
+    'nav_chat': 'କମ୍ୟୁନିଟି',
+    'nav_stats': 'ପରିସଂଖ୍ୟାନ',
+    'nav_docs': 'ଗସ୍ତ',
+    'nav_face': 'ସ୍କାନ୍',
+    'nav_predict': 'ପୂର୍ବାନୁମାନ',
+    'nav_admin': 'ଆଡମିନ୍',
+    'sos': 'ଜରୁରୀକାଳୀନ SOS',
+    'call': 'କଲ୍ କରନ୍ତୁ',
+    'add_med': 'ନୂଆ ଔଷଧ ଯୋଡନ୍ତୁ',
+    'thinking': 'ଭାବୁଛି...',
+    'stop_assistant': 'ସହାୟକଙ୍କୁ ବନ୍ଦ କରୁଛି',
+    'vitals_logged': 'ଭାଇଟାଲ୍ସ ସଫଳତାର ସହିତ ଲଗ୍ ହୋଇଛି'
+  }
+};
+
+const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+let currentAudio: HTMLAudioElement | null = null;
+
+const playNeuralAudio = async (text: string, lang: string, userId?: number, gender?: string, pitch?: number, rate?: number) => {
+  if (currentAudio) {
+    try {
+      currentAudio.pause();
+      currentAudio.src = '';
+    } catch (e) { }
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/generate-speech`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, language: lang, user_id: userId, gender, pitch, rate })
+    });
+
+    if (!response.ok) throw new Error("TTS Generation failed");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudio = audio;
+    audio.onended = () => {
+      if (currentAudio) URL.revokeObjectURL(currentAudio.src);
+      currentAudio = null;
+      (window as any).onAudioEnded?.();
+    };
+    await audio.play();
+    return true;
+  } catch (e) {
+    console.warn("Neural TTS failed, falling back to local:", e);
+    return false;
+  }
+};
+
+function detectLangFromText(text: string): SupportedLang {
+  const lower = text.toLowerCase();
+  if (/[\u0900-\u097F]/.test(text)) return 'hi';
+  if (/[\u0B80-\u0BFF]/.test(text)) return 'ta';
+  if (/[\u0C00-\u0C7F]/.test(text)) return 'te';
+  if (/[\u0C80-\u0CFF]/.test(text)) return 'kn';
+  if (/[\u0D00-\u0D7F]/.test(text)) return 'ml';
+  if (/[\u0980-\u09FF]/.test(text)) return 'bn';
+  if (/[\u0A80-\u0AFF]/.test(text)) return 'gu';
+  if (/[\u0A00-\u0A7F]/.test(text)) return 'pa';
+  if (/[\u0B00-\u0B7F]/.test(text)) return 'or';
+  if (/[\u0600-\u06FF]/.test(text)) return 'ur';
+
+  const hi_keywords = ['namaste', 'kaise', 'kya', 'hai', 'main', 'mujhe', 'karna', 'batao', 'dawa'];
+  const ta_keywords = ['vanakkam', 'epdi', 'irukinga', 'saptinga', 'marundhu', 'mathirai'];
+  const te_keywords = ['namaskaram', 'ela', 'unnavu', 'unnara', 'mandhu'];
+
+  let scores = { hi: 0, ta: 0, te: 0, kn: 0, ml: 0, en: 0 };
+  const words = lower.split(/\s+/);
+  words.forEach(word => {
+    if (hi_keywords.includes(word)) scores.hi += 2;
+    if (ta_keywords.includes(word)) scores.ta += 2;
+    if (te_keywords.includes(word)) scores.te += 2;
+  });
+
+  let maxScore = 0;
+  let detected: SupportedLang = 'en';
+  (Object.keys(scores) as (keyof typeof scores)[]).forEach(lang => {
+    if (scores[lang] > maxScore) {
+      maxScore = scores[lang];
+      detected = lang as SupportedLang;
+    }
+  });
+  return maxScore < 1 ? 'en' : detected;
+}
+
+const langToSpeechCode = (lang: SupportedLang): string => {
+  const map: Record<SupportedLang, string> = {
+    en: 'en-US', hi: 'hi-IN', ta: 'ta-IN', te: 'te-IN', kn: 'kn-IN', ml: 'ml-IN',
+    bn: 'bn-IN', gu: 'gu-IN', mr: 'mr-IN', pa: 'pa-IN', or: 'or-IN', ur: 'ur-IN',
+    as: 'as-IN', mai: 'hi-IN', sat: 'hi-IN', ks: 'ur-IN', ne: 'ne-IN', kok: 'kok-IN',
+    sd: 'hi-IN', doi: 'hi-IN', mni: 'bn-IN', brx: 'hi-IN', sa: 'hi-IN'
+  };
+  return map[lang] || 'en-US';
+};
+
+
+
+const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isSimpleMode] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [activeTab, setActiveTab] = useState<'home' | 'meds' | 'docs' | 'stats' | 'face' | 'predict' | 'admin' | 'chat'>('home');
+  const [adminSubTab, setAdminSubTab] = useState<'overview' | 'content' | 'media' | 'users' | 'settings' | 'logs' | 'monitor' | 'database'>('overview');
+  const [medicines, setMedicines] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [vitals, setVitals] = useState({
+    bp: { systolic: 0, diastolic: 0, last_checked: 'Never' },
+    sugar: { level: 0, last_checked: 'Never' },
+    heart_rate: { bpm: 0, last_checked: 'Never' }
+  });
+  const [facialAnalysisData, setFacialAnalysisData] = useState<any>(null); // State for facial analysis results
+  const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Default to light, will be updated by currentUser
+  const [fontSizeScale, setFontSizeScale] = useState(1.0); // Default to 1.0, will be updated by currentUser
+
+  // Translation Helper
+  const t = (key: string) => {
+    const lang = (currentUser?.preferred_language || 'en') as string;
+    return translations[lang]?.[key] || translations['en'][key] || key;
+  };
+
+  const fetchMedicines = async () => {
+    if (!currentUser) return;
+    try {
+      const userId = currentUser.id || currentUser.user_id;
+      const res = await fetch(`${API_BASE_URL}/medicines?user_id=${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMedicines(Array.isArray(data.medicines) ? data.medicines : []);
+      } else {
+        setMedicines([]);
+      }
+    } catch (err) {
+      console.error("Error fetching medicines:", err);
+      setMedicines([]);
+    }
+  };
+
+  const fetchUserSettings = async (userId: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/${userId}`);
+      if (res.ok) {
+        const userData = await res.json();
+        setCurrentUser((prev: any) => {
+          const updated = { ...prev, ...userData };
+          
+          return updated;
+        });
+        return userData;
+      }
+    } catch (err) {
+      console.error("Error fetching user settings:", err);
+    }
+    return null;
+  };
+
+  const fetchAppointments = async () => {
+    if (!currentUser) return;
+    try {
+      const userId = currentUser.id || currentUser.user_id;
+      const res = await fetch(`${API_BASE_URL}/appointments?user_id=${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAppointments(data.appointments || []);
+      }
+    } catch (err) { }
+  };
+
+  const [continuousListening, setContinuousListening] = useState(false);
+  const continuousListeningRef = useRef(false);
+  const recognitionStateRef = useRef<'IDLE' | 'STARTING' | 'LISTENING' | 'STOPPING'>('IDLE');
+  const lastTranscriptRef = useRef<{ text: string, time: number }>({ text: '', time: 0 });
+  const patienceTimerRef = useRef<any>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showVitalsForm, setShowVitalsForm] = useState(false);
+  const [editingVitals, setEditingVitals] = useState<any>(null);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', phone: '' });
+  const [authError, setAuthError] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<any>(null);
+  const [activeAlertMed, setActiveAlertMed] = useState<any>(null);
+  const activeAlertMedRef = useRef(activeAlertMed);
+  useEffect(() => { activeAlertMedRef.current = activeAlertMed; }, [activeAlertMed]);
+
+  const [showMedModal, setShowMedModal] = useState(false);
+  const [editingMed, setEditingMed] = useState<any>(null);
+  const [showNetworkHelp, setShowNetworkHelp] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [aiResponse, setAiResponse] = useState('');
+
+  useEffect(() => {
+    if (currentUser) {
+      setTheme(currentUser.theme || 'light');
+      setFontSizeScale(currentUser.font_size_scale || 1.0);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    document.documentElement.style.setProperty('--app-font-scale', fontSizeScale.toString());
+  }, [theme, fontSizeScale]);
+
+  useEffect(() => {
+    continuousListeningRef.current = continuousListening;
+    if (continuousListening && !isListening) {
+      startListening();
+    } else if (!continuousListening && isListening) {
+      stopListening();
+    }
+  }, [continuousListening]);
+
+  useEffect(() => {
+    if (currentUser?.ai_always_active !== undefined) {
+      setContinuousListening(!!currentUser.ai_always_active);
+    }
+  }, [currentUser?.ai_always_active]);
+
+useEffect(() => {
+    const savedUserId = readStoredUserId() || localStorage.getItem('user_id');
+    if (savedUserId) {
+      const id = Number(savedUserId);
+      setCurrentUser({ id });
+      setIsLoggedIn(true);
+      if (id) {
+        fetchUserSettings(id);
+      }
+    }
+  }, []);
+
+  const handleDeleteVitals = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this health record?")) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/vitals/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchVitals();
+        speak("Vitals record deleted.");
+      }
+    } catch (e) { }
+  };
+
+  // Poll for User Status Updates (Role changes)
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/users/${currentUser.id}/status`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.role !== currentUser.role) {
+            console.log(`Role updated: ${currentUser.role} -> ${data.role}`);
+            const updatedUser = { ...currentUser, role: data.role };
+            setCurrentUser(updatedUser);
+            setStoredUser(updatedUser);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to poll user status", e);
+      }
+    }, 2000); // Check every 2 seconds
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  const fetchVitals = async () => {
+    if (!currentUser) return;
+    try {
+      // Robust ID retrieval
+      const userId = currentUser.id ?? currentUser.user_id;
+      if (!userId) {
+        console.error("No valid user ID found for fetching vitals");
+        return;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/vitals?user_id=${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        console.log("[App] Fetched vitals data:", data);
+
+        // Deep parsing with fallback to existing state if null to avoid flicker
+        // But here we want to trust the backend. If backend sends 0, it means 0.
+
+        setVitals({
+          bp: {
+            systolic: Number(data.bp?.systolic ?? data.bp_systolic ?? 0),
+            diastolic: Number(data.bp?.diastolic ?? data.bp_diastolic ?? 0),
+            last_checked: String(data.bp?.last_checked || data.recorded_at || 'Never')
+          },
+          sugar: {
+            level: Number(data.sugar?.level ?? data.sugar_level ?? 0),
+            last_checked: String(data.sugar?.last_checked || data.recorded_at || 'Never')
+          },
+          heart_rate: {
+            // Handle both nested object and direct number formats
+            bpm: typeof data.heart_rate === 'object' ?
+              Number(data.heart_rate.bpm?.bpm ?? data.heart_rate.bpm ?? 0) :
+              Number(data.heart_rate ?? 0),
+            last_checked: typeof data.heart_rate === 'object' ?
+              String(data.heart_rate.last_checked || 'Never') :
+              String(data.recorded_at || 'Never')
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to fetch vitals:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (isInitialLoad && currentUser) {
+      setIsInitialLoad(false);
+      const initFetches = async () => {
+        await Promise.all([
+          fetchVitals(),
+          fetchMedicines(),
+          fetchAppointments()
+        ]);
+        if (currentUser?.ai_always_active) {
+          setContinuousListening(true);
+          setTimeout(() => startListening(), 1000);
+        }
+      };
+      initFetches();
+    }
+  }, [currentUser, isInitialLoad]);
+
+  useEffect(() => {
+    if (currentUser && !isInitialLoad) {
+      const interval = setInterval(() => {
+        fetchVitals();
+        fetchMedicines();
+        fetchAppointments();
+        checkReminders();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser, isInitialLoad]); // Only depend on currentUser and load state, not the data arrays themselves to avoid loops
+
+  // FIX: Track processed reminders across re-renders/fetches to prevent duplicates
+  const processedRemindersRef = useRef<Set<string>>(new Set());
+
+  const checkReminders = () => {
+    const now = new Date();
+    const currentTimeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+    const [nowH, nowM] = currentTimeStr.split(':').map(Number);
+    const todayStr = now.toDateString(); // Ensure keys are unique per day
+
+    // --- MEDICINE REMINDERS ---
+    if (medicines && Array.isArray(medicines)) {
+      medicines.forEach(med => {
+        if (med.taken) return;
+
+        const [medH, medM] = med.time.split(':').map(Number);
+        const diffMinutes = (nowH * 60 + nowM) - (medH * 60 + medM);
+
+        // Create a unique key for this specific reminder instance
+        const reminderKey = `${todayStr}_${med.id}_${diffMinutes}`;
+
+        if (processedRemindersRef.current.has(reminderKey)) return;
+
+        // T = 0 Minutes: Alarm + Voice + Modal
+        if (diffMinutes === 0) {
+          processedRemindersRef.current.add(reminderKey);
+          setActiveAlertMed(med);
+          playSound('alert');
+          const mealText = med.after_meal ? 'after your meal' : 'before your meal';
+          const greeting = currentUser?.name ? `Hello ${currentUser.name.split(' ')[0]}, ` : '';
+          speak(`${greeting}it is time for your medication. Please take ${med.name}, ${med.dosage}, ${mealText}.`, 'en');
+          return;
+        }
+
+        // T + 2 Minutes: Alarm + Voice
+        if (diffMinutes === 2) {
+          processedRemindersRef.current.add(reminderKey);
+          setActiveAlertMed(med);
+          playSound('alert');
+          speak(`Gentle reminder: You need to take ${med.name}. Remember, take ${med.dosage}.`, 'en');
+          return;
+        }
+
+        // T + 4 Minutes: Alarm + Voice (Urgent)
+        if (diffMinutes === 4) {
+          processedRemindersRef.current.add(reminderKey);
+          setActiveAlertMed(med);
+          playSound('alert');
+          speak(`Urgent reminder: You have not used ${med.name} yet. It is important for your health. Please use it now.`, 'en');
+          return;
+        }
+
+        // T + 6 Minutes: Mark as Missed automatically
+        if (diffMinutes === 6) {
+          processedRemindersRef.current.add(reminderKey);
+          if (activeAlertMed?.id === med.id) setActiveAlertMed(null);
+
+          speak(`I haven't received confirmation for ${med.name}, so I am marking it as missed for now.`, 'en');
+          fetch(`${API_BASE_URL}/medicines/${med.id}/missed`, { method: 'POST' }).then(() => {
+            fetchMedicines();
+          });
+        }
+      });
+    }
+
+    // --- APPOINTMENT REMINDERS ---
+    if (appointments && Array.isArray(appointments)) {
+      appointments.forEach(appo => {
+        // appo.date is YYYY-MM-DD
+        const todayISO = now.toISOString().split('T')[0];
+        if (appo.date !== todayISO) return;
+
+        const [appoH, appoM] = appo.time.split(':').map(Number);
+        const diffMinutes = (nowH * 60 + nowM) - (appoH * 60 + appoM);
+
+        const appoKeyPrefix = `${todayStr}_appo_${appo.id}`;
+
+        // 1. T - 30 Minutes: Warning
+        if (diffMinutes === -30) {
+          const key = `${appoKeyPrefix}_minus30`;
+          if (!processedRemindersRef.current.has(key)) {
+            processedRemindersRef.current.add(key);
+            speak(`You have an appointment with Dr. ${appo.doctor_name} in 30 minutes.`, 'en');
+          }
+        }
+
+        // 2. T = 0 Minutes: Alarm + Voice
+        if (diffMinutes === 0) {
+          const key = `${appoKeyPrefix}_now`;
+          if (!processedRemindersRef.current.has(key)) {
+            processedRemindersRef.current.add(key);
+            playSound('alert');
+            speak(`Your appointment with Dr. ${appo.doctor_name} is starting now. Reason: ${appo.reason}.`, 'en');
+          }
+        }
+      });
+    }
+  };
+
+  const playSound = (type: string) => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      oscillator.connect(gainNode); gainNode.connect(audioContext.destination);
+      switch (type) {
+        case 'click': oscillator.frequency.value = 800; break;
+        case 'success': oscillator.frequency.value = 1200; break;
+        case 'alert': oscillator.frequency.value = 400; break;
+        default: oscillator.frequency.value = 600;
+      }
+      gainNode.gain.value = 0.1;
+      oscillator.start(); oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (e) { }
+  };
+
+  const speak = async (text: string, language?: SupportedLang, _options: any = {}) => {
+    if (currentAudio) { try { currentAudio.pause(); currentAudio.src = ''; } catch (e) { } }
+    speechSynthesis.cancel();
+
+    if (!text) return;
+    const lang = language || 'en';
+    const locale = langToSpeechCode(lang);
+
+    console.log(`[SPEAK] ${text} (${lang})`);
+
+    // Stop listening while speaking to prevent feedback
+    if (window.currentRecognition) {
+      try {
+        recognitionStateRef.current = 'STOPPING';
+        window.currentRecognition.stop();
+      } catch (e) { }
+    }
+
+    setIsSpeaking(true);
+    const success = await playNeuralAudio(
+      text,
+      lang,
+      currentUser?.id,
+      currentUser?.ai_voice_gender,
+      currentUser?.ai_voice_pitch,
+      currentUser?.ai_voice_rate
+    );
+    if (!success) {
+      console.log(`[SPEAK] Falling back to Web Speech API`);
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = locale;
+      utterance.rate = currentUser?.ai_voice_rate || 1.0;
+      utterance.pitch = currentUser?.ai_voice_pitch || 1.0;
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        // Rely on recognition.onend for the restart loop
+      };
+      speechSynthesis.speak(utterance);
+    } else {
+      (window as any).onAudioEnded = () => {
+        setIsSpeaking(false);
+        // Rely on recognition.onend for the restart loop
+      };
+    }
+  };
+
+  const startListening = async () => {
+    if (!SpeechRecognition) {
+      console.warn("[SPEECH] Web Speech API not supported");
+      return;
+    }
+
+    // GUARD: Prevent overlapping recognition starts or if mic is locked by another component
+    if (recognitionStateRef.current !== 'IDLE' || window.micLock) {
+      console.log(`[SPEECH] Cannot start: State is ${recognitionStateRef.current}, Lock: ${window.micLock}`);
+      return;
+    }
+
+    console.log(`[SPEECH] Starting fresh recognition instance...`);
+    recognitionStateRef.current = 'STARTING';
+
+    const recognition = new SpeechRecognition();
+    window.currentRecognition = recognition;
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    // Standardize Language Code for Browser
+    recognition.lang = langToSpeechCode(currentUser?.ai_language || currentUser?.preferred_language || 'en');
+
+    recognition.onstart = () => {
+      console.log(`[SPEECH] Recognition Active`);
+      recognitionStateRef.current = 'LISTENING';
+      setIsListening(true);
+    };
+
+    recognition.onresult = async (event: any) => {
+      let finalTranscript = '';
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
+        else interimTranscript += event.results[i][0].transcript;
+      }
+
+      if (interimTranscript) {
+        setAiResponse(interimTranscript);
+        // Reset patience timer if user is still speaking
+        if (patienceTimerRef.current) clearTimeout(patienceTimerRef.current);
+      }
+
+      if (!finalTranscript) return;
+
+      // PATIENCE BUFFER: Wait for 1.0s after a final result to see if more follows (elderly friendly)
+      if (patienceTimerRef.current) clearTimeout(patienceTimerRef.current);
+
+      const transcriptClean = finalTranscript.trim();
+      patienceTimerRef.current = setTimeout(async () => {
+        console.log(`[SPEECH] Processed after patience: "${transcriptClean}"`);
+
+        // DUPLICATE SUPPRESSION (3-second window)
+        const now = Date.now();
+        if (lastTranscriptRef.current.text === transcriptClean && now - lastTranscriptRef.current.time < 3000) {
+          console.log("[SPEECH] Suppressing duplicate command");
+          return;
+        }
+        lastTranscriptRef.current = { text: transcriptClean, time: now };
+
+        const transcriptLower = transcriptClean.toLowerCase();
+        const wakeWords = [
+          'hey g', 'hey guardian', 'गार्जियन', 'காப்பாளர்', 'గార్డియన్', 'assistant', 'guardian', 'hey g!',
+          'నమస్కారం', 'नमस्ते', 'வணக்கம்', 'নমস্কার', 'नमस्कार', 'નમસ્તે', 'ನಮಸ್ತೆ', 'നമസ്കാരം', 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ', 'ہیلو', 'ନମସ୍କାର'
+        ];
+        const stopWords = [
+          'stop', 'बंद करो', 'निकालो', 'exit', 'quit', 'stop listening',
+          'ఆపు', 'நிறுத்து', 'বন্ধ করো', 'थांबवा', 'બંધ કરો', 'ನಿಲ್ಲಿಸು', 'നിർത്തുക', 'ਰੁਕੋ', 'روکیں', 'ବନ୍ଦ କର'
+        ];
+
+
+        if (stopWords.some(w => transcriptLower.includes(w))) {
+          speak("Stopping assistant", 'en');
+          stopListening();
+          setAiResponse('');
+          return;
+        }
+
+        // --- VOICE COMMAND FOR MEDICINE CONFIRMATION ---
+        const takenKeywords = ['taken', 'took', 'done', 'consumed', 'finished', 'had it'];
+        // FIX: Use Ref to access latest state inside callback closure
+        if (activeAlertMedRef.current && takenKeywords.some(w => transcriptLower.includes(w))) {
+          console.log("[VOICE] Detected medicine confirmation via voice");
+          speak(`Great job taking your ${activeAlertMedRef.current.name}. Logging it now.`, 'en');
+
+          // Call Backend
+          fetch(`${API_BASE_URL}/medicines/${activeAlertMedRef.current.id}/taken`, { method: 'POST' }).then(() => {
+            setActiveAlertMed(null);
+            fetchMedicines(); // Refresh UI
+          });
+          return; // Stop processing, do not send to AI
+        }
+
+        const hasWakeWord = wakeWords.some(w => transcriptLower.includes(w)) || transcriptLower === 'g';
+        const shouldProcess = !continuousListeningRef.current || (window as any).forceAIResponse || hasWakeWord;
+
+        if (shouldProcess) {
+          (window as any).forceAIResponse = false;
+          setIsProcessing(true);
+          setAiResponse('Thinking...');
+          const detected = detectLangFromText(finalTranscript);
+          // PRIORITY: Use user's preferred AI language if available, fallback to detected
+          const aiLang = (currentUser?.ai_language || currentUser?.preferred_language || detected);
+
+          console.log(`[AI] Command: ${finalTranscript} (Detected: ${detected}, Using: ${aiLang})`);
+
+          try {
+            const res = await fetch(`${API_BASE_URL}/ai/chat`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                text: finalTranscript,
+                user_id: currentUser?.id,
+                language: aiLang,
+                gender: currentUser?.ai_voice_gender || 'Female'
+              })
+            });
+            const data = await res.json();
+            setIsProcessing(false);
+
+            if (data.intent === 'navigate' || data.intent === 'ui_navigate') {
+              const target = data.parameters?.target || data.parameters?.destination || data.parameters?.id || data.parameters?.page;
+              console.log(`[AI ACTION] Navigation requested to: ${target}`);
+              if (target) {
+                const success = UIAutomation.navigate(target);
+                if (!success && ['home', 'meds', 'chat', 'stats', 'docs', 'face', 'predict', 'admin'].includes(target)) {
+                  console.log(`[AI ACTION] Direct state navigation fallback for: ${target}`);
+                  setActiveTab(target as any);
+                }
+              }
+            } else if (data.intent === 'update_settings') {
+              const newLang = data.parameters?.preferred_language || data.parameters?.language;
+              if (newLang && currentUser) handleUpdateSettings({ preferred_language: newLang });
+            } else if (data.intent === 'ui_click') {
+              const target = data.parameters?.identifier || data.parameters?.target || data.parameters?.id;
+              console.log(`[AI ACTION] Click requested: ${target}`);
+              UIAutomation.clickElement(target);
+            } else if (data.intent === 'ui_fill_form') {
+              console.log(`[AI ACTION] Form fill requested: ${data.parameters?.field_name} = ${data.parameters?.value}`);
+              UIAutomation.fillField(data.parameters?.field_name, data.parameters?.value);
+            } else if (data.intent === 'log_vitals') {
+              const params = data.parameters || {};
+              console.log(`[AI ACTION] Logging vitals:`, params);
+              setEditingVitals({
+                bp_systolic: params.bp_systolic || 120,
+                bp_diastolic: params.bp_diastolic || 80,
+                sugar_level: params.sugar_level || 100,
+                heart_rate: params.heart_rate || 72,
+                notes: params.notes || 'Logged via voice'
+              });
+              setShowVitalsForm(true);
+            }
+
+            const responseText = data.response_text || data.response;
+            setAiResponse(responseText);
+            speak(responseText, detected, { type: 'ai' });
+          } catch (e) {
+            setIsProcessing(false);
+            setAiResponse('Sorry, I encountered an error.');
+          }
+        }
+      }, 1000);
+    };
+
+    recognition.onerror = (event: any) => {
+      if (event.error === 'no-speech') return; // Silent handling for expected idle timeout
+      console.warn(`[SPEECH RECOGNITION ERROR] ${event.error}`);
+      if (event.error === 'not-allowed') {
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (!isLocalhost) {
+          setShowNetworkHelp(true);
+        } else {
+          console.warn("Microphone access denied. If using non-localhost, ensure HTTPS is used.");
+        }
+        setContinuousListening(false);
+        continuousListeningRef.current = false;
+      }
+    };
+
+    recognition.onend = () => {
+      console.log(`[SPEECH] Recognition ended. State was: ${recognitionStateRef.current}`);
+      setIsListening(false);
+      recognitionStateRef.current = 'IDLE';
+
+      // Clear reference
+      if (window.currentRecognition === recognition) {
+        window.currentRecognition = null;
+      }
+
+      // Restart ONLY if continuous is ON, we are NOT speaking, and mic is NOT locked
+      if (continuousListeningRef.current && !isSpeaking && !window.micLock) {
+        if (window.speechRestartTimer) clearTimeout(window.speechRestartTimer);
+        const restartTimer = setTimeout(() => {
+          // Double check conditions after delay
+          if (continuousListeningRef.current && !isSpeaking && recognitionStateRef.current === 'IDLE' && !window.micLock) {
+            console.log(`[SPEECH] Triggering auto-restart...`);
+            startListening();
+          }
+        }, 1500); // 1.5s delay to let the system fully release the mic
+        window.speechRestartTimer = restartTimer;
+      }
+    };
+    try { recognition.start(); } catch (e) { setIsListening(false); }
+  };
+
+  const stopListening = () => {
+    setContinuousListening(false);
+    setIsListening(false);
+    if (window.speechRestartTimer) clearTimeout(window.speechRestartTimer);
+    if (window.currentRecognition) {
+      try { window.currentRecognition.stop(); } catch (e) { }
+      window.currentRecognition = null;
+    }
+  };
+
+  const handleEditMed = (med: any) => {
+    setEditingMed(med);
+    setShowMedModal(true);
+  };
+
+  const handleDeleteMed = async (id: number) => {
+    setConfirmModal({
+      title: "Delete Medicine?",
+      message: "This will remove it from your schedule permanently.",
+      onConfirm: async () => {
+        await fetch(`${API_BASE_URL}/medicines/${id}`, { method: 'DELETE' });
+        fetchMedicines();
+        setConfirmModal(null);
+        speak("Medicine deleted.", 'en');
+      },
+      type: 'danger'
+    });
+  };
+
+  const handleMarkTakenList = async (id: number) => {
+    const res = await fetch(`${API_BASE_URL}/medicines/${id}/taken`, { method: 'POST' });
+    if (res.ok) {
+      fetchMedicines();
+      speak("Marked as taken.", 'en');
+    }
+  };
+
+  const handleUpdateSettings = async (newSettings: any) => {
+    if (!currentUser) return;
+    try {
+      setCurrentUser((prev: any) => {
+        const updated = { ...prev, ...newSettings };
+        
+        return updated;
+      });
+
+      const response = await fetch(`${API_BASE_URL}/api/settings/${currentUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Settings update failed:', error);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Settings update response:', data);
+    } catch (e: any) {
+      console.error('Settings sync error:', e);
+    }
+  };
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAuthenticating(true);
+    setAuthError('');
+    try {
+      const endpoint = authMode === 'signin' ? '/api/login' : '/api/signup';
+      const body = authMode === 'signin'
+        ? { name_or_email: authForm.email, password: authForm.password }
+        : { name: authForm.name, email: authForm.email, password: authForm.password, phone: authForm.phone };
+
+      console.log(`[AUTH] Calling ${endpoint}...`);
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Server error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        if (authMode === 'signup') {
+          setAuthMode('signin');
+          setAuthError('Account created successfully! Please sign in.');
+        } else {
+          setCurrentUser(data.user);
+          setIsLoggedIn(true);
+          setStoredUserId(data.user?.id);
+          playSound('success');
+        }
+      } else {
+        setAuthError(data.detail || 'Authentication failed');
+      }
+    } catch (e: any) {
+      console.error("[AUTH ERROR]", e);
+      if (e.message.includes('fetch')) {
+        setAuthError('Cannot connect to server. Please check if backend is running on port 8008.');
+      } else {
+        setAuthError(e.message || 'Connection error. Is the backend running?');
+      }
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  if (isLoggedIn && !currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen flex flex-col md:flex-row bg-white overflow-hidden">
+        {/* Left Panel: Branding */}
+        <div className="flex-1 p-12 md:p-24 flex flex-col justify-between text-white relative overflow-hidden min-h-[40vh] md:min-h-screen">
+          <div className="absolute inset-0 z-0 bg-gradient-to-br from-sapphire-700 via-sapphire-800 to-emerald-900" />
+
+          {/* Decorative Orbs */}
+          <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-emerald-400 rounded-full blur-[150px] opacity-20 animate-pulse" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-sapphire-400 rounded-full blur-[150px] opacity-20" />
+
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="z-10 flex items-center gap-4"
+          >
+            <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 shadow-2xl" style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
+              <Heart className="w-10 h-10 text-emerald-400 fill-emerald-400/20" />
+            </div>
+            <span className="text-3xl font-black tracking-tighter premium-text-display">EG AI</span>
+          </motion.div>
+
+          <div className="z-10 mt-auto">
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="text-6xl md:text-8xl font-black mb-8 leading-[0.9] premium-text-display"
+            >
+              {t('welcome_guardian').split(',')[0]}<br />
+              {t('welcome_guardian').split(',')[1] || ''}
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="text-xl md:text-2xl text-white/70 max-w-md font-medium leading-relaxed"
+            >
+              {t('welcome_sub')}
+            </motion.p>
+          </div>
+        </div>
+
+        {/* Right Panel: Auth Form */}
+        <div className="flex-1 flex items-center justify-center p-8 bg-slate-50 dark:bg-slate-900 relative">
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="w-full max-w-md space-y-8 p-8"
+          >
+            <div className="space-y-2">
+              <h2 className="text-5xl font-black text-slate-900 tracking-tight">
+                {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
+              </h2>
+              <p className="text-slate-500 font-medium text-lg">
+                {authMode === 'signin' ? 'Access your health dashboard.' : 'Start your journey to better health.'}
+              </p>
+            </div>
+
+            {authError && (
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm font-bold flex items-center gap-3">
+                <AlertCircle className="w-5 h-5" />
+                {authError}
+              </motion.div>
+            )}
+
+            <form onSubmit={handleAuth} className="space-y-6">
+              <AnimatePresence mode="wait">
+                {authMode === 'signup' && (
+                  <motion.div
+                    key="signup-fields"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-6 overflow-hidden"
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="space-y-1"
+                    >
+                      <label className="text-xs font-black text-sapphire-600 uppercase tracking-widest ml-1">Full Name</label>
+                      <input placeholder="e.g. John Doe" required className="glass-input-light w-full focus:ring-2 focus:ring-sapphire-500/20" value={authForm.name} onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
+                        style={{ backgroundColor: window.matchMedia('(prefers-color-scheme: dark)').matches || document.documentElement.classList.contains('dark') ? '#020617' : undefined }}
+                      />
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="space-y-1"
+                    >
+                      <label className="text-xs font-black text-sapphire-600 uppercase tracking-widest ml-1">Phone</label>
+                      <input placeholder="e.g. +91 98765 43210" required className="glass-input-light w-full focus:ring-2 focus:ring-sapphire-500/20" value={authForm.phone} onChange={e => setAuthForm({ ...authForm, phone: e.target.value })}
+                        style={{ backgroundColor: window.matchMedia('(prefers-color-scheme: dark)').matches || document.documentElement.classList.contains('dark') ? '#020617' : undefined }}
+                      />
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="space-y-1"
+              >
+                <label className="text-xs font-black text-sapphire-600 uppercase tracking-widest ml-1">Email Address</label>
+                <input placeholder="Enter your registered email" type="text" required className="glass-input-light w-full focus:ring-2 focus:ring-sapphire-500/20" value={authForm.email} onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
+                  style={{ backgroundColor: window.matchMedia('(prefers-color-scheme: dark)').matches || document.documentElement.classList.contains('dark') ? '#020617' : undefined }}
+                />
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 }}
+                className="space-y-1 relative"
+              >
+                <label className="text-xs font-black text-sapphire-600 uppercase tracking-widest ml-1">Password</label>
+                <div className="relative">
+                  <input
+                    placeholder="Enter your password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    className="glass-input-light w-full text-2xl tracking-widest placeholder:text-lg placeholder:tracking-normal focus:ring-2 focus:ring-sapphire-500/20 pr-14"
+                    value={authForm.password}
+                    onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                    style={{ backgroundColor: window.matchMedia('(prefers-color-scheme: dark)').matches || document.documentElement.classList.contains('dark') ? '#020617' : undefined }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-sapphire-600 transition-colors p-2"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </motion.div>
+
+
+
+              <button type="submit" disabled={isAuthenticating} className="btn-premium w-full py-6 text-2xl group shadow-2xl flex items-center justify-center gap-3">
+                {isAuthenticating ? 'Authenticating...' : (authMode === 'signin' ? 'Sign In' : 'Sign Up')}
+                {!isAuthenticating && <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />}
+              </button>
+            </form>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => { setAuthMode(authMode === 'signin' ? 'signup' : 'signin'); setAuthError(''); }}
+              className="w-full text-center py-4 rounded-2xl border-2 border-emerald-500/20 bg-emerald-50/50 text-emerald-700 font-extrabold uppercase tracking-widest text-sm shadow-sm transition-all hover:border-emerald-500/40 hover:text-emerald-800 hover:bg-emerald-100/50"
+            >
+              {authMode === 'signin' ? "Don't have an account? Sign Up Now" : "Already have an account? Sign In"}
+            </motion.button>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn("min-h-screen transition-all duration-500 pb-24", theme === 'dark' ? "text-white" : (isSimpleMode ? "bg-white" : "bg-sapphire-50"))}
+      style={{ backgroundColor: theme === 'dark' ? '#020617' : undefined }}
+    >
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        :root { font-size: calc(16px * var(--app-font-scale, 1)); }
+        
+        body { transition: background-color 0.5s ease, color 0.5s ease; }
+      `}} />
+
+
+      <header className={cn(
+        "p-6 flex justify-between items-center max-w-5xl mx-auto w-full sticky top-0 z-50 transition-all duration-300",
+        theme === 'dark' ? "bg-[#0f172a]/90 border-b border-white/10 shadow-lg shadow-black/20" : "bg-white/80 shadow-sm border-b border-gray-200/50"
+      )} style={{ backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }}>
+        <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('home')}>
+          <div className="w-12 h-12 bg-gradient-to-br from-sapphire-500 to-emerald-500 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg">EG</div>
+          <div>
+            <h2
+              className="text-xl font-black"
+              style={{ color: theme === 'dark' ? '#ffffff' : '#000000' }}
+            >
+              {t('hello')}, {currentUser?.name?.split(' ')[0]}
+            </h2>
+            <p
+              className="text-sm font-bold"
+              style={{ color: theme === 'dark' ? '#cbd5e1' : '#334155' }}
+            >
+              {t('feeling_today')}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-4 items-center">
+          {/* Animated Theme Toggle Buttons */}
+          <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-full shadow-inner border border-gray-200 dark:border-gray-700">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => handleUpdateSettings({ theme: 'light' })}
+              className={cn("p-2 rounded-full transition-all", theme === 'light' ? "bg-white shadow-md text-amber-500" : "text-gray-400")}
+            >
+              <Sun className="w-5 h-5" />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => handleUpdateSettings({ theme: 'dark' })}
+              className={cn("p-2 rounded-full transition-all", theme === 'dark' ? "bg-gray-900 shadow-md text-indigo-400" : "text-gray-400")}
+            >
+              <Moon className="w-5 h-5" />
+            </motion.button>
+          </div>
+
+          <button onClick={() => setShowSettings(true)} className="p-3 bg-white dark:bg-gray-900 shadow-md rounded-full border border-sapphire-100"><Settings className="w-6 h-6" /></button>
+          <button onClick={() => { clearStoredUser(); window.location.reload(); } className="p-3 bg-white dark:bg-gray-900 shadow-md rounded-full border border-sapphire-100 text-red-500"><LogOut className="w-6 h-6" /></button>
+          <button onClick={() => setShowNotifications(!showNotifications)} className="p-3 bg-white dark:bg-gray-900 shadow-md rounded-full border border-sapphire-100 relative group">
+            <Bell className="w-6 h-6" />
+            {((medicines?.filter(m => !m.taken)?.length || 0) + (appointments?.length || 0)) > 0 && (
+              <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-white" />
+            )}
+          </button>
+          <NotificationDropdown
+            isOpen={showNotifications}
+            onClose={() => setShowNotifications(false)}
+            medicines={medicines}
+            appointments={appointments}
+            vitalsCheckedToday={vitals.heart_rate.last_checked !== 'Never'}
+            isSimpleMode={isSimpleMode}
+          />
+        </div>
+      </header>
+
+      <main className={cn(
+        "mx-auto pt-8 space-y-12 transition-all duration-300",
+        activeTab === 'chat'
+          ? "max-w-[95vw] px-4 pb-4"
+          : "max-w-5xl px-6 pb-24"
+      )}>
+        <AnimatePresence mode="wait">
+          {activeTab === 'home' && (
+            <motion.div key="home" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-12">
+
+              <AIAgentVisualizer
+                state={
+                  isSpeaking ? 'speaking' :
+                    isProcessing ? 'processing' :
+                      isListening ? 'listening' :
+                        continuousListening ? 'continuous' : 'idle'
+                }
+                label={aiResponse}
+                onClick={() => { (window as any).forceAIResponse = true; startListening(); }}
+                onLogVitals={() => setShowVitalsForm(true)}
+              />
+            </motion.div>
+
+            <HealthReport
+              userId={currentUser?.id || currentUser?.user_id}
+              currentVitals={vitals}
+              facialAnalysisData={facialAnalysisData}
+            />
+          </motion.div>
+          )}
+
+          {activeTab === 'meds' && (
+            <motion.div key="meds" className="space-y-8">
+              <div className="flex justify-between items-center">
+                <h2 className="text-4xl font-black">{t('nav_meds')}</h2>
+                <button
+                  onClick={() => { setEditingMed(null); setShowMedModal(true); }}
+                  className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
+                >
+                  <Pill className="w-5 h-5" /> {t('add_med')}
+                </button>
+              </div>
+
+              <PrescriptionUploader userId={currentUser.id} onSuccess={fetchMedicines} speak={(txt: string) => speak(txt)} />
+
+              <MedicineList
+                userId={currentUser.id}
+                medicines={medicines}
+                onDelete={handleDeleteMed}
+                onEdit={handleEditMed}
+                onMarkTaken={handleMarkTakenList}
+              />
+
+              <MedicineEntryModal
+                isOpen={showMedModal}
+                onClose={() => setShowMedModal(false)}
+                userId={currentUser.id}
+                onSuccess={fetchMedicines}
+                speak={(txt: string) => speak(txt)}
+                initialData={editingMed}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'chat' && (
+            <motion.div key="chat" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+              <CommunityChat currentUser={currentUser} />
+            </motion.div>
+          )}
+
+          {activeTab === 'docs' && <VoiceBooking userId={currentUser.id} userSettings={currentUser} onUpdateSettings={handleUpdateSettings} onSuccess={fetchAppointments} />}
+          {activeTab === 'predict' && <DiseasePrediction />}
+          {activeTab === 'face' && <FacialAnalysis onAnalysisComplete={(data) => setFacialAnalysisData(data)} />}
+          {activeTab === 'stats' && <VitalsMonitor userId={currentUser.id} onEdit={(v) => { setEditingVitals(v); setShowVitalsForm(true); }} onDelete={handleDeleteVitals} />}
+          {activeTab === 'admin' && (
+            <motion.div key="admin" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8">
+              <div className="flex flex-col lg:flex-row gap-8">
+                {/* Admin Sidebar */}
+                <div className="w-full lg:w-72 space-y-2">
+                  <div className="p-6 mb-6 bg-slate-900 rounded-[2.5rem] text-white overflow-hidden relative group">
+                    <div className="absolute inset-0 bg-blue-600/10 group-hover:bg-blue-600/20 transition-colors" />
+                    <div className="relative z-10 flex items-center gap-4">
+                      <div className="p-3 bg-white/10 rounded-2xl border border-white/20">
+                        <Shield className="w-6 h-6 text-emerald-400" />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-sm uppercase tracking-widest">Admin Core</h4>
+                        <p className="text-[10px] font-bold text-slate-400">System v2.4.0</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {[
+                    { id: 'overview', label: 'Overview', icon: BarChart3 },
+                    { id: 'content', label: 'CMS Manager', icon: FileText },
+                    { id: 'media', label: 'Media Assets', icon: ImageIcon },
+                    { id: 'users', label: 'User Center', icon: Users },
+                    { id: 'database', label: 'Database', icon: Database },
+                    { id: 'logs', label: 'Security Logs', icon: Lock },
+                    { id: 'monitor', label: 'System Health', icon: Monitor },
+                    { id: 'settings', label: 'Site Config', icon: Layout },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      id={`admin-subtab-${tab.id}`}
+                      onClick={() => setAdminSubTab(tab.id as any)}
+                      className={cn(
+                        "w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black transition-all group",
+                        adminSubTab === tab.id
+                          ? "bg-sapphire-600 text-white shadow-xl shadow-sapphire-200"
+                          : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      <tab.icon className={cn("w-5 h-5", adminSubTab === tab.id ? "text-white" : "group-hover:text-sapphire-600")} />
+                      <span className="text-sm">{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Main Admin Viewport */}
+                <div className="flex-1 min-h-[600px] animate-in fade-in slide-in-from-right-8 duration-500">
+                  {adminSubTab === 'overview' && <AdminOverview />}
+                  {adminSubTab === 'content' && <ContentManager />}
+                  {adminSubTab === 'media' && <MediaLibrary />}
+                  {adminSubTab === 'users' && <UserManagement />}
+                  {adminSubTab === 'database' && <DatabaseManager />}
+                  {adminSubTab === 'logs' && <AuditLogs />}
+                  {adminSubTab === 'monitor' && <SystemMonitor />}
+                  {adminSubTab === 'settings' && <SystemSettings />}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.button onClick={() => window.location.href = `tel:${currentUser?.emergency_contact_phone || ''}`} className="w-full p-10 bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-[3rem] shadow-2xl flex items-center justify-between group">
+          <div className="text-left"><h3 className="text-4xl font-black uppercase">{t('sos')}</h3><p className="opacity-70 font-bold">{t('call')} {currentUser?.emergency_contact_name || 'Emergency Contact'} {currentUser?.emergency_contact_phone ? `(${currentUser.emergency_contact_phone})` : ''}</p></div>
+          <PhoneCall className="w-20 h-20 group-hover:rotate-12 transition-transform" />
+        </motion.button>
+      </main >
+
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-2xl rounded-[3rem] p-2 flex justify-around items-center z-50 shadow-[0_20px_50px_rgba(0,0,0,0.15)] bg-white/5 border border-white/10" style={{ backdropFilter: 'blur(60px)', WebkitBackdropFilter: 'blur(60px)' }}>
+        {[
+          { icon: Activity, label: t('nav_health'), id: 'home' },
+          { icon: Pill, label: t('nav_meds'), id: 'meds' },
+          { icon: MessageSquare, label: t('nav_chat'), id: 'chat' },
+          { icon: BarChart2, label: t('nav_stats'), id: 'stats' },
+          { icon: Calendar, label: t('nav_docs'), id: 'docs' },
+          { icon: Camera, label: t('nav_face'), id: 'face' },
+          { icon: Brain, label: t('nav_predict'), id: 'predict' },
+          // Admin Tab (Visible only to admins)
+          ...(currentUser?.role === 'admin' ? [{ icon: Shield, label: t('nav_admin'), id: 'admin' }] : [])
+        ].map(item => (
+          <button
+            key={item.id}
+            id={`nav-tab-${item.id}`}
+            onClick={() => { setActiveTab(item.id as any); playSound('click'); }}
+            className={cn(
+              "flex flex-col items-center p-4 rounded-[2rem] transition-all",
+              activeTab === item.id
+                ? "bg-sapphire-600 text-white"
+                : (theme === 'dark' ? "text-slate-400" : "text-slate-700")
+            )}}
+          >
+            <item.icon className="w-6 h-6" />
+            <span className="text-[10px] font-black uppercase tracking-widest mt-1">{item.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} userSettings={currentUser || {}} onSave={handleUpdateSettings} isSimpleMode={isSimpleMode} />
+
+      <VitalsInput
+        isOpen={showVitalsForm}
+        onClose={() => { setShowVitalsForm(false); setEditingVitals(null); }}
+        userId={currentUser?.id || currentUser?.user_id}
+        onVitalsUpdated={fetchVitals}
+        lastRecordedVitals={vitals}
+        initialData={editingVitals}
+      />
+
+      <ConfirmationModal isOpen={!!confirmModal} onClose={() => setConfirmModal(null)} {...confirmModal} />
+      <MedicineReminderAlert
+        medicine={activeAlertMed}
+        onClose={() => setActiveAlertMed(null)}
+        onReplay={() => {
+          if (activeAlertMed) {
+            const mealText = activeAlertMed.after_meal ? 'after your meal' : 'before your meal';
+            const greeting = currentUser?.name ? `Hello ${currentUser.name.split(' ')[0]}, ` : '';
+            speak(`${greeting}it is time for your medication. Please take ${activeAlertMed.dosage} of ${activeAlertMed.name}, ${mealText}.`, 'en');
+          }
+        }}
+        onMarkAsTaken={async (id: number) => {
+          const res = await fetch(`${API_BASE_URL}/medicines/${id}/taken`, { method: 'POST' });
+          if (res.ok) {
+            setActiveAlertMed(null);
+            fetchMedicines();
+            speak("Thank you. I have marked your medicine as taken.", 'en');
+          }
+        }}
+      />
+      <LocationTracker currentUser={currentUser} />
+      <NetworkHelpModal isOpen={showNetworkHelp} onClose={() => setShowNetworkHelp(false)} />
+
+
+
+    </div >
+  );
+};
+
+export default App;

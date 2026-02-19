@@ -1,0 +1,33 @@
+{
+  "id": "chatcmpl-aada01fe-65e9-4410-aafe-5932508e033b",
+  "object": "chat.completion",
+  "created": 1768466809,
+  "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n\"medications\": [\n    {\n      \"name\": \"Demo Medicine 1\",\n      \"dosage\": \"1\",\n      \"timing\": \"1 Morning, 1 Night (Before Food)\"\n    },\n    {\n      \"name\": \"Demo Medicine 2\",\n      \"dosage\": \"1\",\n      \"timing\": \"1 Morning, 1 Night (Before Food)\"\n    },\n    {\n      \"name\": \"Demo Medicine 3\",\n      \"dosage\": \"1\",\n      \"timing\": \"1 Morning, 1 Afternoon, 1 Evening, 1 Night (After Food)\"\n    },\n    {\n      \"name\": \"Demo Medicine 4\",\n      \"dosage\": \"1/2\",\n      \"timing\": \"1/2 Morning, 1/2 Night (Before Food)\"\n    }\n  ]\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "queue_time": 0.162101508,
+    "prompt_tokens": 892,
+    "prompt_time": 0.031822623,
+    "completion_tokens": 178,
+    "completion_time": 0.428183299,
+    "total_tokens": 1070,
+    "total_time": 0.460005922
+  },
+  "usage_breakdown": null,
+  "system_fingerprint": "fp_79da0e0073",
+  "x_groq": {
+    "id": "req_01kf0dc0ccfy59nf4t5q7dwrv8",
+    "seed": 122321521
+  },
+  "service_tier": "on_demand"
+}

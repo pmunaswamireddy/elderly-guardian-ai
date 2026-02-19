@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Debugger</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+
+        .voice-entry {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .indic {
+            border-left: 5px solid #2ecc71;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>System Voices Detected:</h1>
+    <div id="status">Waiting for voices...</div>
+    <div id="voices"></div>
+
+    <script>
+        function displayVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            const container = document.getElementById('voices');
+            const status = document.getElementById('status');
+
+            if (voices.length === 0) {
+                status.innerText = "No voices found. Check browser permissions or system settings.";
+                return;
+            }
+
+            status.innerText = `Found ${voices.length} voices.`;
+            container.innerHTML = '';
+
+            voices.forEach(voice => {
+                const div = document.createElement('div');
+                div.className = 'voice-entry';
+                // Highlight Indic languages
+                if (['hi', 'te', 'ta', 'mr', 'kn', 'gu'].some(l => voice.lang.includes(l))) {
+                    div.classList.add('indic');
+                }
+                div.innerText = `Name: "${voice.name}" | Lang: ${voice.lang} | LocalService: ${voice.localService}`;
+                container.appendChild(div);
+            });
+
+            // Log for automation capture
+            console.log('VOICES_DUMP_START');
+            console.log(JSON.stringify(voices.map(v => ({ name: v.name, lang: v.lang })), null, 2));
+            console.log('VOICES_DUMP_END');
+        }
+
+        // Chrome/Edge load voices asynchronously
+        if (window.speechSynthesis.getVoices().length > 0) {
+            displayVoices();
+        } else {
+            window.speechSynthesis.onvoiceschanged = displayVoices;
+        }
+
+        // Force retry after 1s just in case
+        setTimeout(displayVoices, 1000);
+    </script>
+</body>
+
+</html>

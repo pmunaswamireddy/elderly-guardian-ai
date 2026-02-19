@@ -1,0 +1,8 @@
+
+--- Running Test: Hindi - Doctor Stage ---
+Status: 200
+ERROR: 'charmap' codec can't encode characters in position 23-28: character maps to <undefined>
+
+--- Running Test: Telugu - Reason Stage (Testing Loop Fix) ---
+Status: 200
+ERROR: 'charmap' codec can't encode characters in position 80-85: character maps to <undefined>

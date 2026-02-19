@@ -1,0 +1,3 @@
+
+// This file is unused as I will modify App.tsx directly. 
+// Just ensuring I don't overwrite App.tsx by mistake.
