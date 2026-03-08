@@ -1,0 +1,16 @@
+{
+  "name": "Elderly Guardian AI",
+  "short_name": "Guardian AI",
+  "description": "Premium AI-powered health and safety companion for the elderly.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
