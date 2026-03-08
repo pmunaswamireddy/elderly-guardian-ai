@@ -2,18 +2,17 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, Moon, History, Settings, LogOut, Bell, Info } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { User, Appointment } from '../../types';
+import type { User, Appointment } from '../../types';
 import { NotificationDropdown } from '../NotificationDropdown';
 
 interface HeaderProps {
     user: User;
-    activeTab: string;
     setActiveTab: (tab: any) => void;
     speech: any; // Simplified type for prompt extraction
     updateUserSettings: (settings: Partial<User>) => void;
     setShowInfo: (val: boolean) => void;
     setShowHistoryModal: (val: boolean) => void;
-    handleOpenSettings: (section: string) => void;
+    handleOpenSettings: (section: 'profile' | 'preferences') => void;
     logout: () => void;
     showNotifications: boolean;
     setShowNotifications: (val: boolean) => void;
@@ -23,7 +22,6 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
     user,
-    activeTab,
     setActiveTab,
     speech,
     updateUserSettings,

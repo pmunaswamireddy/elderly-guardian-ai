@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { PhoneCall } from 'lucide-react';
-import { User } from '../types';
+import type { User } from '../types';
 
 interface SOSButtonProps {
     user: User;

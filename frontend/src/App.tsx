@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from './utils/cn';
-import { Activity, Calendar, BarChart2, Pill, Camera, Shield, Users, BarChart3, Database, Monitor, MessageSquare, X } from 'lucide-react';
+import { Eye, EyeOff, Activity, Calendar, BarChart2, Pill, Camera, Heart, Shield, Users, BarChart3, Database, Monitor, MessageSquare, X, Fingerprint, Lock, Github, Zap, Clock, MapPin, UserCheck } from 'lucide-react';
 import { API_BASE_URL } from './config';
-import type { User, Medicine, VitalsRecord, Appointment, AnalysisResult } from './types';
+import type { User, Medicine, VitalsRecord, AnalysisResult } from './types';
 
 
 // Custom Hooks
@@ -21,7 +21,6 @@ import VoiceBooking from './components/VoiceBooking';
 import FacialAnalysis from './components/FacialAnalysis';
 import DiseasePrediction from './components/DiseasePrediction';
 import { SettingsModal } from './components/SettingsModal';
-import { NotificationDropdown } from './components/NotificationDropdown';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import VitalsMonitor from './components/VitalsMonitor';
 import VitalsInput from './components/VitalsInput';
@@ -113,7 +112,6 @@ const App: React.FC = () => {
     const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void; type?: 'danger' | 'warning' } | null>(null);
     const [activeAlertMed, setActiveAlertMed] = useState<Medicine | null>(null);
     const [facialAnalysisData, setFacialAnalysisData] = useState<AnalysisResult | null>(null);
-    const [vitalsUpdateCount, setVitalsUpdateCount] = useState(0);
     const [isSimpleMode] = useState(true);
     const [vitalsUpdateCount, setVitalsUpdateCount] = useState(0);
     const userRef = useRef<User | null>(user);
@@ -1000,7 +998,6 @@ const App: React.FC = () => {
         <div className={cn("min-h-screen transition-all duration-500 pb-24", user.theme === 'dark' ? "bg-[#020617] text-white" : "bg-slate-50 text-slate-900")}>
             <Header
                 user={user as User}
-                activeTab={activeTab}
                 setActiveTab={setActiveTab}
                 speech={speech}
                 updateUserSettings={updateUserSettings}
