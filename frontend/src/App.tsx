@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from './utils/cn';
-import { Eye, EyeOff, Activity, Calendar, BarChart2, Pill, Camera, Heart, Shield, Users, LogOut, Sun, Moon, Settings, Bell, PhoneCall, BarChart3, Database, Monitor, MessageSquare, Info, X, Fingerprint, Lock, Github, Zap, Clock, MapPin, UserCheck, History } from 'lucide-react';
+import { Activity, Calendar, BarChart2, Pill, Camera, Shield, Users, BarChart3, Database, Monitor, MessageSquare, X } from 'lucide-react';
 import { API_BASE_URL } from './config';
 import type { User, Medicine, VitalsRecord, Appointment, AnalysisResult } from './types';
 
@@ -42,6 +42,8 @@ import type { ChatMessage } from './components/ChatHistoryModal';
 import OAuthModal from './components/OAuthModal';
 import { ProfileCompletionView } from './components/auth/ProfileCompletionView';
 import { supabase } from './supabaseClient';
+import { SOSButton } from './components/SOSButton';
+import { Header } from './components/layout/Header';
 
 
 const ParticleBackground: React.FC = () => (
@@ -113,8 +115,7 @@ const App: React.FC = () => {
     const [facialAnalysisData, setFacialAnalysisData] = useState<AnalysisResult | null>(null);
     const [vitalsUpdateCount, setVitalsUpdateCount] = useState(0);
     const [isSimpleMode] = useState(true);
-    const [sosProgress, setSosProgress] = useState(0);
-    const [sosActive, setSosActive] = useState(false);
+    const [vitalsUpdateCount, setVitalsUpdateCount] = useState(0);
     const userRef = useRef<User | null>(user);
     useEffect(() => { userRef.current = user; }, [user]);
 
@@ -257,45 +258,7 @@ const App: React.FC = () => {
     }, [updateUserSettings, handleOpenSettings]);
 
     // --- SOS Hold Logic ---
-    const sosRef = useRef<number>(0);
-    const startTimeRef = useRef<number>(0);
 
-    const startSosHold = () => {
-        // e.preventDefault(); // Prevent default touch actions (scrolling) if needed
-        setSosActive(true);
-        startTimeRef.current = Date.now();
-        const duration = (user?.emergency_hold_duration || 3) * 1000;
-
-        // Instant call if duration is 0
-        if (duration <= 0) {
-            window.location.href = `tel:${user?.emergency_contact_phone || ''}`;
-            setSosActive(false);
-            return;
-        }
-
-        const animate = () => {
-            const elapsed = Date.now() - startTimeRef.current;
-            const progress = Math.min((elapsed / duration) * 100, 100);
-            setSosProgress(progress);
-
-            if (progress >= 100) {
-                // Trigger Call
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                window.location.href = `tel:${user?.emergency_contact_phone || ''}`;
-                setSosActive(false);
-                setSosProgress(0);
-            } else {
-                sosRef.current = requestAnimationFrame(animate);
-            }
-        };
-        sosRef.current = requestAnimationFrame(animate);
-    };
-
-    const endSosHold = () => {
-        setSosActive(false);
-        setSosProgress(0);
-        if (sosRef.current) cancelAnimationFrame(sosRef.current);
-    };
 
     // Sync AI Always Active setting
     useEffect(() => {
@@ -1035,58 +998,21 @@ const App: React.FC = () => {
 
     return (
         <div className={cn("min-h-screen transition-all duration-500 pb-24", user.theme === 'dark' ? "bg-[#020617] text-white" : "bg-slate-50 text-slate-900")}>
-            <header className="p-6 flex justify-between items-center max-w-5xl mx-auto w-full sticky top-0 z-50 bg-transparent backdrop-blur-sm">
-                <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('home')}>
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg">EG</div>
-                    <div><h2 className="text-xl font-black">{speech.t('hello')}, {user.name?.split(' ')[0] || 'Guardian'}</h2><p className="text-sm font-bold opacity-70">{speech.t('feeling_today')}</p></div>
-                </div>
-                <div className="flex gap-4 items-center">
-                    {/* Centered Info Button */}
-                    <div className="absolute left-1/2 -translate-x-1/2 hidden md:block">
-                        <button
-                            onClick={() => setShowInfo(true)}
-                            className="p-3 bg-white/20 dark:bg-slate-800/30 backdrop-blur-xl hover:bg-white/40 dark:hover:bg-slate-700/50 shadow-lg rounded-full border border-white/20 dark:border-slate-700/50 transition-all group scale-110"
-                            title="App Info"
-                        >
-                            <Info className="w-6 h-6 text-blue-500 dark:text-blue-400 group-hover:rotate-12 transition-transform" />
-                        </button>
-                    </div>
-
-                    {/* Theme Toggle */}
-                    <button
-                        onClick={() => updateUserSettings({ theme: user.theme === 'dark' ? 'light' : 'dark' })}
-                        className="p-3 bg-white/10 backdrop-blur-xl shadow-lg rounded-full border border-white/10 relative overflow-hidden group"
-                    >
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={user.theme === 'dark' ? 'dark' : 'light'}
-                                initial={{ y: -20, opacity: 0, rotate: -45 }}
-                                animate={{ y: 0, opacity: 1, rotate: 0 }}
-                                exit={{ y: 20, opacity: 0, rotate: 45 }}
-                                transition={{ duration: 0.2 }}
-                            >
-                                {user.theme === 'dark' ? <Moon className="w-6 h-6 text-indigo-300" /> : <Sun className="w-6 h-6 text-amber-500" />}
-                            </motion.div>
-                        </AnimatePresence>
-                    </button>
-
-                    <button
-                        onClick={() => setShowHistoryModal(true)}
-                        className={cn("p-3 shadow-md rounded-full border transition-all hover:scale-110", user.theme === 'dark' ? "bg-slate-800 border-slate-700 text-sapphire-400" : "bg-white border-slate-100 text-sapphire-600")}
-                        title="Conversation History"
-                    >
-                        <History className="w-6 h-6" />
-                    </button>
-
-                    <button onClick={() => handleOpenSettings('preferences')} className={cn("p-3 shadow-md rounded-full border", user.theme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100")}><Settings className="w-6 h-6" /></button>
-                    <button onClick={logout} className={cn("p-3 shadow-md rounded-full border text-red-500", user.theme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100")}><LogOut className="w-6 h-6" /></button>
-                    <button onClick={() => setShowNotifications(!showNotifications)} className={cn("p-3 shadow-md rounded-full border relative", user.theme === 'dark' ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100")}>
-                        <Bell className="w-6 h-6" />
-                        {((vitalsData.medicines?.filter(m => !m.taken)?.length || 0) + (vitalsData.appointments?.length || 0)) > 0 && <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-white" />}
-                    </button>
-                    <NotificationDropdown isOpen={showNotifications} onClose={() => setShowNotifications(false)} medicines={vitalsData.medicines} appointments={vitalsData.appointments as Appointment[]} vitalsCheckedToday={vitalsData.vitals.heart_rate.last_checked !== 'Never'} isSimpleMode={isSimpleMode} />
-                </div>
-            </header>
+            <Header
+                user={user as User}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                speech={speech}
+                updateUserSettings={updateUserSettings}
+                setShowInfo={setShowInfo}
+                setShowHistoryModal={setShowHistoryModal}
+                handleOpenSettings={handleOpenSettings}
+                logout={logout}
+                showNotifications={showNotifications}
+                setShowNotifications={setShowNotifications}
+                vitalsData={vitalsData}
+                isSimpleMode={isSimpleMode}
+            />
 
             <main className={cn("mx-auto pt-8 pb-40 space-y-12", activeTab === 'chat' ? "max-w-[95vw] px-4" : "max-w-5xl px-6")}>
                 <AnimatePresence mode="wait">
@@ -1170,47 +1096,7 @@ const App: React.FC = () => {
                         </div>
                     )}
                 </AnimatePresence>
-                <motion.button
-                    onMouseDown={startSosHold}
-                    onMouseUp={endSosHold}
-                    onMouseLeave={endSosHold}
-                    onTouchStart={startSosHold}
-                    onTouchEnd={endSosHold}
-                    className="w-full p-10 bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-[3rem] shadow-2xl flex items-center justify-between group relative overflow-hidden select-none touch-none"
-                    style={{ WebkitUserSelect: 'none' }} // Prevent text selection on hold
-                >
-                    {/* Progress Fill Overlay */}
-                    <div
-                        className="absolute inset-0 bg-white/30 transition-all duration-75 ease-linear pointer-events-none"
-                        style={{ width: `${sosProgress}%` }}
-                    />
-
-                    <div className="text-left relative z-10">
-                        <h3 className="text-2xl font-black uppercase opacity-90 mb-2">
-                            {sosActive && sosProgress > 0 ? (sosProgress >= 100 ? 'CALLING...' : 'HOLD TO CALL...') : 'Emergency SOS'}
-                        </h3>
-                        <div className="flex flex-col">
-                            <span className="opacity-80 font-bold text-xs uppercase tracking-widest">
-                                {sosActive ? 'Keep Holding...' : `Call ${user.emergency_contact_name || 'Emergency Contact'}`}
-                            </span>
-                            <span className="text-4xl font-black tracking-tighter mt-1">{user.emergency_contact_phone || 'No Number'}</span>
-                        </div>
-                    </div>
-                    {/* Circular Progress (Optional visual flair) or Icon */}
-                    <div className="relative z-10 w-20 h-20 flex items-center justify-center">
-                        {sosActive ? (
-                            <div className="relative w-full h-full flex items-center justify-center">
-                                <svg className="w-full h-full rotate-[-90deg]">
-                                    <circle cx="40" cy="40" r="36" stroke="rgba(255,255,255,0.2)" strokeWidth="6" fill="transparent" />
-                                    <circle cx="40" cy="40" r="36" stroke="white" strokeWidth="6" fill="transparent" strokeDasharray="226" strokeDashoffset={226 - (226 * sosProgress) / 100} strokeLinecap="round" />
-                                </svg>
-                                <PhoneCall className="w-10 h-10 absolute text-white animate-pulse" />
-                            </div>
-                        ) : (
-                            <PhoneCall className="w-20 h-20 group-hover:rotate-12 transition-transform" />
-                        )}
-                    </div>
-                </motion.button>
+                <SOSButton user={user as User} />
             </main>
 
             {/* Persistent AI Bubble - Visible on all pages except 'home' */}

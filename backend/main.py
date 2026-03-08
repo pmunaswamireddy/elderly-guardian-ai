@@ -45,7 +45,7 @@ NEURAL_VOICES = {
 }
 
 # CONFIG: API Keys
-GROQ_API_KEY       = os.getenv("GROQ_API_KEY")       or "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"
+GROQ_API_KEY       = os.getenv("GROQ_API_KEY")
 GEMINI_API_KEY     = os.getenv("GEMINI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or ""   # https://openrouter.ai – free signup, 200 req/min free
 MISTRAL_API_KEY    = os.getenv("MISTRAL_API_KEY")    or ""   # https://console.mistral.ai – free tier
