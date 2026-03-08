@@ -10,10 +10,13 @@ export default defineConfig({
   ],
   server: {
     host: true,
-    https: {
-      key: fs.readFileSync(path.resolve(__dirname, '../backend/certs/key.pem')),
-      cert: fs.readFileSync(path.resolve(__dirname, '../backend/certs/cert.pem')),
-    }
+    https: fs.existsSync(path.resolve(__dirname, '../backend/certs/key.pem')) && 
+           fs.existsSync(path.resolve(__dirname, '../backend/certs/cert.pem')) 
+      ? {
+          key: fs.readFileSync(path.resolve(__dirname, '../backend/certs/key.pem')),
+          cert: fs.readFileSync(path.resolve(__dirname, '../backend/certs/cert.pem')),
+        }
+      : false
   }
 })
 
