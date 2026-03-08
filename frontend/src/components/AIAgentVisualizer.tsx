@@ -16,9 +16,10 @@ interface AIAgentVisualizerProps {
     onViewHistory?: () => void;
     t?: (key: string) => string;
     isAudioBlocked?: boolean;
+    className?: string;
 }
 
-export const AIAgentVisualizer: React.FC<AIAgentVisualizerProps> = ({ state, onClick, onLogVitals, label, isMuted, onToggleMute, floating, onViewHistory, t, isAudioBlocked }) => {
+export const AIAgentVisualizer: React.FC<AIAgentVisualizerProps> = ({ state, onClick, onLogVitals, label, isMuted, onToggleMute, floating, onViewHistory, t, isAudioBlocked, className }) => {
     // Utility for local translation or fallback
     const translate = (key: string, fallback: string) => {
         if (t) return t(key);
@@ -35,7 +36,7 @@ export const AIAgentVisualizer: React.FC<AIAgentVisualizerProps> = ({ state, onC
             <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="fixed bottom-40 right-6 z-[60] flex flex-col items-end gap-3"
+                className={cn("fixed bottom-40 right-6 z-[60] flex flex-col items-end gap-3", className)}
             >
                 <AnimatePresence>
                     {(label || isProcessing || isSpeaking || isListening) && (
@@ -90,7 +91,7 @@ export const AIAgentVisualizer: React.FC<AIAgentVisualizerProps> = ({ state, onC
     }
 
     return (
-        <div className="flex flex-col items-center justify-center py-12 relative">
+        <div className={cn("flex flex-col items-center justify-center py-12 relative", className)}>
             <div className="relative group">
                 {/* Background Glows */}
                 <AnimatePresence>

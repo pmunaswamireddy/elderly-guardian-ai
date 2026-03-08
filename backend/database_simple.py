@@ -1175,6 +1175,23 @@ def get_all_users() -> List[Dict]:
     conn.close()
     return users
 
+def create_guest_user() -> Optional[Dict]:
+    """Create a temporary guest user with unique identifiers"""
+    import uuid
+    import random
+    
+    guest_id = str(uuid.uuid4())[:8]
+    guest_name = f"Guest_{guest_id}"
+    guest_email = f"guest_{guest_id}@elderlyguardian.com"
+    guest_password = "guestpassword123" # Standard for all guests, but IDs are unique
+    
+    # Randomly assign a role or other temp attributes if needed
+    user = create_user(guest_name, guest_email, guest_password, role="guest")
+    if user:
+        print(f"[DB DEBUG] Created temporary guest: {guest_name}")
+        return user
+    return None
+
 def create_user(name: str, email: str, password: str, phone: str = None, role: str = "user") -> Optional[Dict]:
     """Create a new user"""
     conn = db.get_connection()

@@ -1,13 +1,40 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { API_BASE_URL } from '../config';
 
+interface ISpeechRecognitionEvent {
+    resultIndex: number;
+    results: {
+        length: number;
+        [index: number]: {
+            isFinal: boolean;
+            [index: number]: {
+                transcript: string;
+            };
+        };
+    };
+}
+
+interface ISpeechRecognition extends EventTarget {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    onstart: (() => void) | null;
+    onresult: ((event: ISpeechRecognitionEvent) => void) | null;
+    onerror: ((event: { error: string }) => void) | null;
+    onend: (() => void) | null;
+    start: () => void;
+    stop: () => void;
+}
+
 declare global {
     interface Window {
-        currentRecognition: any;
+        currentRecognition: ISpeechRecognition | null;
         micLock: boolean;
-        speechRestartTimer: any;
-        onAudioEnded: any;
-        forceAIResponse: any;
+        speechRestartTimer: number | null;
+        onAudioEnded: (() => void) | null;
+        forceAIResponse: ((text: string) => void) | null;
+        webkitSpeechRecognition: { new(): ISpeechRecognition };
+        SpeechRecognition: { new(): ISpeechRecognition };
     }
 }
 
@@ -322,13 +349,22 @@ const translations: Record<string, Record<string, string>> = {
     }
 };
 
-const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+interface UserSettings {
+    id?: string | number;
+    ai_voice_gender?: string;
+    ai_voice_pitch?: number;
+    ai_voice_rate?: number;
+    ai_voice_clarity?: number;
+    ai_voice_model?: string;
+}
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 export function useSpeech(
     onText: (t: string, isManual: boolean) => void,
     speechLang: string = 'en',
     uiLang: string = 'en',
-    userSettings?: any,
+    userSettings?: UserSettings,
     isDisabled: boolean = false
 ) {
     // --- 1. State Hooks ---
@@ -342,14 +378,13 @@ export function useSpeech(
     const [isContinuous, setIsContinuous] = useState(false);
 
     // --- 2. Ref Hooks ---
-    const followUpTimerRef = useRef<any>(null);
+    const followUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const silentAudioRef = useRef<HTMLAudioElement | null>(null);
     const currentAudioRef = useRef<HTMLAudioElement | null>(null);
     const recognitionStateRef = useRef<'IDLE' | 'STARTING' | 'LISTENING' | 'STOPPING'>('IDLE');
     const lastTranscriptRef = useRef<{ text: string, time: number }>({ text: '', time: 0 });
-    const patienceTimerRef = useRef<any>(null);
+    const patienceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const manualOverrideRef = useRef(false);
-    const lastRestartTimeRef = useRef<number>(0);
 
     // --- 3. Helper Callbacks ---
     const t = useCallback((key: string) => {
@@ -358,7 +393,7 @@ export function useSpeech(
     }, [uiLang]);
 
     const langToSpeechCode = useCallback((lang: string): string => {
-        const map: any = {
+        const map: Record<string, string> = {
             en: 'en-US', hi: 'hi-IN', ta: 'ta-IN', te: 'te-IN', kn: 'kn-IN', ml: 'ml-IN',
             bn: 'bn-IN', gu: 'gu-IN', mr: 'mr-IN', pa: 'pa-IN', or: 'or-IN', ur: 'ur-IN'
         };
@@ -370,7 +405,7 @@ export function useSpeech(
             try {
                 currentAudioRef.current.pause();
                 currentAudioRef.current.src = '';
-            } catch (e) { }
+            } catch { /* silent */ }
         }
         try {
             const body = {
@@ -413,8 +448,8 @@ export function useSpeech(
                 await audio.play();
                 setIsAudioBlocked(false);
                 return true;
-            } catch (playError: any) {
-                if (playError.name === 'NotAllowedError') {
+            } catch (playError: unknown) {
+                if (playError instanceof Error && playError.name === 'NotAllowedError') {
                     console.warn("[useSpeech] Play Blocked: User interaction required.");
                     setIsAudioBlocked(true);
                 } else {
@@ -444,7 +479,7 @@ export function useSpeech(
             try {
                 recognitionStateRef.current = 'STOPPING';
                 window.currentRecognition.stop();
-            } catch (e) { }
+            } catch { /* silent */ }
         }
 
         console.log("[useSpeech] Fetching Neural TTS...");
@@ -486,7 +521,7 @@ export function useSpeech(
         recognition.interimResults = true;
         recognition.lang = langToSpeechCode(speechLang);
         recognition.onstart = () => { recognitionStateRef.current = 'LISTENING'; setIsListening(true); };
-        recognition.onresult = async (event: any) => {
+        recognition.onresult = (event: ISpeechRecognitionEvent) => {
             let finalTranscript = ''; let interimTranscript = '';
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
@@ -526,18 +561,17 @@ export function useSpeech(
         };
 
         try {
-            (recognition as any).startTime = Date.now();
             recognition.start();
-        } catch (e) {
-            console.error("Failed to start recognition:", e);
+        } catch (err: unknown) {
+            console.error("Failed to start recognition:", err);
             setIsListening(false);
         }
-    }, [isContinuous, isFollowUp, langToSpeechCode, onText, speechLang, isSpeaking, isMuted, isDisabled]); // Removed startListening from own deps
+    }, [isFollowUp, langToSpeechCode, onText, speechLang, isMuted, isDisabled]); // Removed startListening from own deps
 
     const stopListening = useCallback(() => {
         setIsContinuous(false);
         setIsListening(false);
-        if (window.currentRecognition) { try { window.currentRecognition.stop(); } catch (e) { } window.currentRecognition = null; }
+        if (window.currentRecognition) { try { window.currentRecognition.stop(); } catch { /* silent */ } window.currentRecognition = null; }
     }, []);
 
     const toggleMute = useCallback(() => {
@@ -617,5 +651,5 @@ export function useSpeech(
         toggleMute,
         isAudioBlocked,
         isFollowUp
-    }), [isListening, isSpeaking, isProcessing, aiResponse, t, speak, startListening, stopListening, isContinuous, isMuted, toggleMute, isAudioBlocked, isFollowUp]);
+    }), [isListening, isSpeaking, isProcessing, aiResponse, t, speak, startListening, stopListening, isMuted, toggleMute, isAudioBlocked, isFollowUp]);
 }

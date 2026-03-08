@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from './utils/cn';
-import { ArrowRight, Eye, EyeOff, Activity, Calendar, BarChart2, Pill, Camera, Heart, Shield, Users, LogOut, Sun, Moon, Settings, Bell, PhoneCall, BarChart3, Database, Monitor, MessageSquare, Info, X } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Activity, Calendar, BarChart2, Pill, Camera, Heart, Shield, Users, LogOut, Sun, Moon, Settings, Bell, PhoneCall, BarChart3, Database, Monitor, MessageSquare, Info, X, Fingerprint, Lock, Smartphone, CheckCircle2, Github, Zap, Clock, MapPin, UserCheck, History } from 'lucide-react';
 import { API_BASE_URL } from './config';
 import type { User, Medicine, VitalsRecord, Appointment, AnalysisResult } from './types';
 
@@ -39,11 +39,53 @@ import DatabaseManager from './components/admin/DatabaseManager';
 import { InfoModal } from './components/InfoModal';
 import { ChatHistoryModal } from './components/ChatHistoryModal';
 import type { ChatMessage } from './components/ChatHistoryModal';
-import { History } from 'lucide-react';
+import OAuthModal from './components/OAuthModal';
+
+const OAUTH_PROVIDERS: Record<string, { name: string; color: string; bgColor: string; icon: React.ReactNode }> = {
+    google: {
+        name: 'Google',
+        color: 'text-white',
+        bgColor: 'bg-[#4285F4]',
+        icon: <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+    },
+    github: {
+        name: 'GitHub',
+        color: 'text-white',
+        bgColor: 'bg-[#24292F]',
+        icon: <Github className="w-5 h-5" />
+    }
+};
+
+const ParticleBackground: React.FC = () => (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
+        {[...Array(20)].map((_, i) => (
+            <motion.div
+                key={i}
+                className="absolute w-1 h-1 bg-blue-500 rounded-full"
+                initial={{ 
+                    x: Math.random() * 100 + "%", 
+                    y: Math.random() * 100 + "%",
+                    scale: Math.random() * 2,
+                    opacity: Math.random()
+                }}
+                animate={{ 
+                    y: ["-10%", "110%"],
+                    opacity: [0, 0.5, 0]
+                }}
+                transition={{ 
+                    duration: Math.random() * 10 + 10, 
+                    repeat: Infinity, 
+                    ease: "linear",
+                    delay: Math.random() * 10
+                }}
+            />
+        ))}
+    </div>
+);
 
 const App: React.FC = () => {
     // --- Hooks ---
-    const { user, isLoggedIn, loading, login, signup, logout, updateUserSettings } = useAuth();
+    const { user, isLoggedIn, loading, login, signup, logout, oauthLogin, guestLogin, updateUserSettings, refreshUser } = useAuth();
     // --- UI State ---
     const [activeTab, setActiveTab] = useState<'home' | 'meds' | 'docs' | 'stats' | 'face' | 'predict' | 'admin' | 'chat'>('home');
     const [settingsInitialSection, setSettingsInitialSection] = useState<'profile' | 'preferences'>('profile');
@@ -67,6 +109,21 @@ const App: React.FC = () => {
     const [authError, setAuthError] = useState('');
     const [authSuccess, setAuthSuccess] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [forgotEmail, setForgotEmail] = useState('');
+    const [forgotSent, setForgotSent] = useState(false);
+    const [enable2FA, setEnable2FA] = useState(false);
+    const [agreeTerms, setAgreeTerms] = useState(false);
+    const [authToast, setAuthToast] = useState<{ message: string; type: 'info' | 'success' | 'error'; icon?: string } | null>(null);
+    const [socialLoading, setSocialLoading] = useState<string | null>(null);
+    const [oauthModal, setOauthModal] = useState<{ id: string; name: string; color: string; bgColor: string; icon: React.ReactNode; email: string; displayName: string; avatar?: string } | null>(null);
+    const [emailValid, setEmailValid] = useState<{ valid: boolean; reason: string; checking: boolean } | null>(null);
+    const emailValidTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [isCompletingProfile, setIsCompletingProfile] = useState(false);
+    const [setupForm, setSetupForm] = useState({ username: '', password: '', confirmPassword: '' });
+    const [usernameStatus, setUsernameStatus] = useState<{ available: boolean; reason: string; checking: boolean } | null>(null);
+    const usernameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void; type?: 'danger' | 'warning' } | null>(null);
     const [activeAlertMed, setActiveAlertMed] = useState<Medicine | null>(null);
     const [facialAnalysisData, setFacialAnalysisData] = useState<AnalysisResult | null>(null);
@@ -96,64 +153,36 @@ const App: React.FC = () => {
 
     const speech = useSpeech(
         async (text, isManual) => {
-            // --- Always On Mode: Wake Word Check ---
-            // Unless manually triggered, we only respond to "Hey Guardian" or "Hey G"
             if (userRef.current?.ai_always_active && !isManual) {
-                // Broadened regex for multilingual wake-words, avoids \b for unicode compatibility
-                // Added "KG" (కేజీ) variation for phonetic Telugu confusion
-                const wakeWordRegex = new RegExp(
-                    // English
-                    '^(hey|hay|hi|hello|ok)\\s+(guardian|g|gee|ji)($|[\\s\\.,!\\?])|' +
-                    // Hindi
-                    '^(हे|नमस्ते|हेलो)\\s+(गार्जियन|रक्षक)($|[\\s\\.,!\\?])|' +
-                    // Telugu: Added కేజీ (Phonetic "KG")
-                    '^(హే|నమస్కారం|కేజీ)\\s+(గార్డియన్|రక్షకుడు|జి|గే)($|[\\s\\.,!\\?])|' +
-                    // Tamil
-                    '^(ஹே|வணக்கம்)\\s+(கார்டியన్|பாதுகாவலரே)($|[\\s\\.,!\\?])|' +
-                    // Bengali
-                    '^(হে|নমস্কার)\\s+(গার্ডিয়ান|অভিভাবক)($|[\\s\\.,!\\?])|' +
-                    // Marathi
-                    '^(হে|नमस्कार)\\s+(गार्डियन|रक्षक)($|[\\s\\.,!\\?])|' +
-                    // Gujarati
-                    '^(હે|નમસ્તે)\\s+(ગાર્ડીયન|રક્ષક)($|[\\s\\.,!\\?])|' +
-                    // Kannada
-                    '^(ಹೇ|ನಮಸ್ತೆ)\\s+(ಗಾರ್ಡಿಯನ್|రక్షకుడు)($|[\\s\\.,!\\?])|' +
-                    // Malayalam
-                    '^(హే|నమస్కారం)\\s+(గార్డియన్|రక్షకుడు)($|[\\s\\.,!\\?])|' +
-                    // Punjabi
-                    '^(ਹੇ|ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ)\\s+(ਗਾਰਡੀਅਨ|ਰੱਖਿਅਕ)($|[\\s\\.,!\\?])|' +
-                    // Urdu
-                    '^(ہیلو|سلام)\\s+(گارڈین|محافظ)($|[\\s\\.,!\\?])|' +
-                    // Odia
-                    '^(ହେ|ନମସ୍କାର)\\s+(ଗାର୍ଡିଆନ୍‌|ରକ୍ଷକ)($|[\\s\\.,!\\?])',
-                    'i');
-                if (!wakeWordRegex.test(text)) {
+                const triggers = ['guardian', 'g', 'gee', 'ji', 'guard', 'కేజీ', 'గార్డియన్', 'నమస్కారం', 'गार्जियन', 'नमस्ते'];
+                const textLower = text.toLowerCase();
+                const hasWakeWord = triggers.some(t => textLower.includes(t));
+                if (!hasWakeWord) {
                     console.log(`[AlwaysOn] Ignored '${text}' (No Wake Word)`);
+                    if (speechRef.current) {
+                        speechRef.current.setAiResponse(`👂 Hearing: "${text.substring(0, 15)}..."`);
+                        setTimeout(() => speechRef.current?.setAiResponse(''), 3000);
+                    }
                     return;
                 }
             }
-            // --- Magic Words Check ---
+
             if (user?.magic_words_mappings) {
                 const lowerText = text.toLowerCase().trim().replace(/[.,!]/g, '');
                 for (const [trigger, action] of Object.entries(user.magic_words_mappings)) {
                     if (lowerText === trigger.toLowerCase()) {
-                        console.log(`[Magic Word] Triggered: ${trigger} -> ${action}`);
-
-                        // Execute Magic Action
-                        if (action === 'silent_sos') {
-                            if (user.emergency_contact_phone) {
-                                window.location.href = `tel:${user.emergency_contact_phone}`;
-                            }
-                            return; // Stop AI processing
+                        if (action === 'silent_sos' && user.emergency_contact_phone) {
+                            window.location.href = `tel:${user.emergency_contact_phone}`;
+                            return;
                         }
                         if (action === 'goodnight_protocol') {
                             updateUserSettings({ theme: 'dark', quiet_hours_enabled: true });
-                            if (speechRef.current) speechRef.current.speak("Goodnight Protocol Initiated. Sleep well.", user.preferred_language || 'en');
+                            speechRef.current?.speak("Goodnight Protocol Initiated. Sleep well.", user.preferred_language || 'en');
                             return;
                         }
                         if (action === 'morning_protocol') {
                             updateUserSettings({ theme: 'light', quiet_hours_enabled: false });
-                            if (speechRef.current) speechRef.current.speak("Good Morning Protocol Initiated. Have a great day.", user.preferred_language || 'en');
+                            speechRef.current?.speak("Good Morning Protocol Initiated. Have a great day.", user.preferred_language || 'en');
                             return;
                         }
                     }
@@ -161,48 +190,41 @@ const App: React.FC = () => {
             }
 
             if (speechRef.current) {
-                speechRef.current.stopListening(); // Stop mic immediately to prevent noise during processing
+                speechRef.current.stopListening();
                 speechRef.current.setIsProcessing(true);
             }
 
-            // Log User Message
             setChatHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
 
             const data = await aiEngine.handleChat(text);
             if (data) {
                 speechRef.current?.setAiResponse(data.response_text);
-
-                // Log AI Message
                 setChatHistory(prev => [...prev, { role: 'assistant', text: data.response_text, timestamp: Date.now() }]);
-
-                // Continuity Fix: Trigger speak BEFORE clearing processing state
-                // Use userRef to ensure we have the absolute latest language setting
                 const lang = userRef.current?.ai_language || userRef.current?.preferred_language || 'en';
                 if (speechRef.current) {
                     speechRef.current.speak(data.response_text, lang);
                     speechRef.current.setIsProcessing(false);
                 }
-
-                // Handle direct state navigation if AI intent matches
                 if (data.intent === 'navigate' || data.intent === 'ui_navigate') {
                     const target = data.parameters?.target || data.parameters?.page;
                     if (['home', 'meds', 'chat', 'stats', 'docs', 'face', 'predict', 'admin'].includes(target)) {
-                        // Security Check for Admin
                         if (target === 'admin' && user?.role !== 'admin') {
-                            if (speechRef.current) speechRef.current.speak("I'm sorry, access to the admin panel is restricted.", user?.ai_language || 'en');
+                            speechRef.current?.speak("I'm sorry, access to the admin panel is restricted.", user?.ai_language || 'en');
                             return;
                         }
-                        setActiveTab(target as 'home' | 'meds' | 'docs' | 'stats' | 'face' | 'predict' | 'admin' | 'chat');
+                        setActiveTab(target as typeof activeTab);
                     }
                 }
             }
         },
         user?.ai_language || user?.preferred_language || 'en', // speechLang (AI/Voice)
         user?.preferred_language || 'en',                     // uiLang (App Text)
-        user,
+        user || undefined,
         activeTab === 'docs' || activeTab === 'chat'           // isDisabled
     );
-    speechRef.current = speech;
+    useEffect(() => {
+        speechRef.current = speech;
+    }, [speech]);
 
     const handleInactivityTimeout = useCallback(() => {
         if (user?.emergency_contact_phone) {
@@ -430,7 +452,7 @@ const App: React.FC = () => {
         } catch (e) {
             console.error("Error in checkReminders:", e);
         }
-    }, [user, vitalsData.medicines, vitalsData.appointments, activeAlertMed, speech, vitalsData.fetchMedicines]);
+    }, [user, vitalsData, activeAlertMed, speech]);
 
     useEffect(() => {
         if (isLoggedIn && !vitalsData.isInitialLoad) {
@@ -486,187 +508,411 @@ const App: React.FC = () => {
         </div>
     );
 
+    // Helper: show a toast notification on the auth page
+    const showAuthToast = (message: string, type: 'info' | 'success' | 'error' = 'info', icon?: string) => {
+        setAuthToast({ message, type, icon });
+        setTimeout(() => setAuthToast(null), 3000);
+    };
+
+    // OAuth provider configurations
+    const OAUTH_PROVIDERS: Record<string, { name: string; color: string; bgColor: string; icon: React.ReactNode; email: string; displayName: string }> = {
+        Google: { name: 'Google', color: '#4285F4', bgColor: 'rgba(66,133,244,0.15)', icon: <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G" />, email: 'user@gmail.com', displayName: 'Google User' },
+        GitHub: { name: 'GitHub', color: '#333', bgColor: 'rgba(255,255,255,0.08)', icon: <Github className="w-5 h-5 text-white" />, email: 'dev@github.com', displayName: 'GitHub Developer' },
+        Apple: { name: 'Apple', color: '#555', bgColor: 'rgba(255,255,255,0.06)', icon: <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>, email: 'user@icloud.com', displayName: 'Apple User' },
+        LinkedIn: { name: 'LinkedIn', color: '#0077B5', bgColor: 'rgba(0,119,181,0.15)', icon: <Users className="w-5 h-5 text-blue-400" />, email: 'professional@linkedin.com', displayName: 'LinkedIn Professional' },
+    };
+
+    // Open OAuth modal for a provider
+    const handleSocialLogin = (provider: string) => {
+        const config = OAUTH_PROVIDERS[provider];
+        if (!config) return;
+        setSocialLoading(provider);
+        setAuthError('');
+        setOauthModal({ id: provider, ...config });
+    };
+
+    // Handle OAuth success callback
+    const handleOAuthSuccess = async (data: { provider: string; email: string; name: string; avatar?: string }) => {
+        setOauthModal(null);
+        setSocialLoading(data.provider);
+        showAuthToast('Signing you in...', 'info', '🔑');
+        const result = await oauthLogin(data.provider, data.email, data.name, data.avatar);
+        setSocialLoading(null);
+        if (result.success) {
+            if (result.is_new) {
+                setIsCompletingProfile(true);
+                setSetupForm(prev => ({ ...prev, username: data.name.toLowerCase().replace(/\s+/g, '_') }));
+                showAuthToast('Complete your profile to finish setup!', 'info', '✨');
+            } else {
+                showAuthToast(`Welcome back via ${data.provider}!`, 'success', '✅');
+            }
+        } else {
+            showAuthToast(result.error || 'OAuth login failed', 'error', '❌');
+        }
+    };
+
+    // Username availability checker
+    const checkUsernameAvailability = (username: string) => {
+        if (usernameTimer.current) clearTimeout(usernameTimer.current);
+        if (!username || username.length < 3) { setUsernameStatus(null); return; }
+        
+        setUsernameStatus({ available: false, reason: '', checking: true });
+        usernameTimer.current = setTimeout(async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/check-username/${username}`);
+                const data = await res.json();
+                setUsernameStatus({ available: data.available, reason: data.reason, checking: false });
+            } catch (err) {
+                setUsernameStatus({ available: false, reason: 'Check failed', checking: false });
+            }
+        }, 500);
+    };
+
+    // Save profile completion data (username/password)
+    const handleCompleteProfile = async () => {
+        if (!user || !setupForm.username) return;
+        if (setupForm.password && setupForm.password !== setupForm.confirmPassword) {
+            showAuthToast('Passwords do not match', 'error', '⚠️');
+            return;
+        }
+        if (!usernameStatus?.available) {
+            showAuthToast('Please choose an available username', 'error', '⚠️');
+            return;
+        }
+
+        setSocialLoading('complete-profile');
+        try {
+            // 1. Update Username
+            const userRes = await fetch(`${API_BASE_URL}/api/users/${user.id}/username`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: setupForm.username })
+            });
+            const userData = await userRes.json();
+            if (!userRes.ok) throw new Error(userData.detail || 'Username update failed');
+
+            // 2. Update Password (if provided)
+            if (setupForm.password) {
+                const passRes = await fetch(`${API_BASE_URL}/api/users/${user.id}/password`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: setupForm.password })
+                });
+                if (!passRes.ok) throw new Error('Password update failed');
+            }
+
+            showAuthToast('Profile setup complete! Welcome to Guardian.', 'success', '🎉');
+            setIsCompletingProfile(false);
+            // Refresh user data if needed
+            await refreshUser();
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to complete profile';
+            console.error("Profile completion failed:", err);
+            showAuthToast(errorMessage, 'error', '❌');
+        } finally {
+            setSocialLoading(null);
+        }
+    };
+
+    // Email validation with debounce
+    const validateEmail = (email: string) => {
+        if (emailValidTimer.current) clearTimeout(emailValidTimer.current);
+        if (!email || email.length < 5) { setEmailValid(null); return; }
+        setEmailValid({ valid: false, reason: '', checking: true });
+        emailValidTimer.current = setTimeout(async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/validate-email`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                setEmailValid({ valid: data.valid, reason: data.reason, checking: false });
+            } catch {
+                setEmailValid({ valid: true, reason: 'Could not verify', checking: false });
+            }
+        }, 500);
+    };
+
+    // Simulate biometric authentication
+    const handleBiometricLogin = async () => {
+        setSocialLoading('biometric');
+        setAuthError('');
+        showAuthToast('Scanning biometrics...', 'info', '👆');
+        await new Promise(r => setTimeout(r, 2200));
+        setSocialLoading(null);
+        showAuthToast('Biometric hardware not detected. Please use email login.', 'error', '⚠️');
+    };
+
     if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
 
     if (!isLoggedIn || !user) {
         return (
-            <div className="h-screen flex flex-col md:flex-row bg-[#020617] overflow-hidden selection:bg-sapphire-500/30">
-                {/* Left Side: Cyber Visual Branding */}
-                <div className="hidden md:flex flex-1 p-0 flex-col justify-center items-center text-white relative overflow-hidden h-screen bg-[#020617]">
+            <div className="h-screen w-full flex flex-col md:flex-row bg-[#020617] overflow-hidden selection:bg-sapphire-500/30 relative">
+                {/* Left Side: Cyber Visual Branding (Balanced for 100vh) */}
+                <div className="hidden md:flex flex-1 p-0 flex-col justify-center items-center text-white relative h-full bg-[#020617] border-r border-white/5">
                     <ParticleBackground />
+                    
+                    <div className="w-full h-full flex flex-col items-center justify-around py-12 px-12 relative z-10">
+                        {/* Glowing Portal Visual */}
+                        <div className="cyber-portal-ring scale-75 lg:scale-90">
+                            <motion.div
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ duration: 1.5, repeat: Infinity, repeatType: "reverse" }}
+                            >
+                                <Shield className="w-16 h-16 md:w-20 md:h-20 text-blue-400 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)]" />
+                            </motion.div>
+                        </div>
 
-                    {/* Glowing Portal Visual */}
-                    <div className="cyber-portal-ring scale-90 md:scale-100">
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ duration: 1.5, repeat: Infinity, repeatType: "reverse" }}
-                            className="z-10"
-                        >
-                            <Shield className="w-16 h-16 md:w-20 md:h-20 text-blue-400 drop-shadow-[0_0_30px_rgba(59,130,246,0.6)]" />
-                        </motion.div>
-                    </div>
+                        <div className="text-center space-y-6 max-w-lg">
+                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                                <h1 className="text-4xl lg:text-5xl font-black tracking-tighter text-slate-50 premium-text-glow leading-tight">
+                                    Welcome Back,<br />
+                                    <span className="magical-text italic glitter-text text-emerald-400 text-5xl lg:text-7xl">Guardian.</span>
+                                </h1>
+                                <p className="text-slate-400 text-sm mt-4 font-semibold italic opacity-80">
+                                    "Peace of mind is just a login away. Your safety is our priority."
+                                </p>
+                            </motion.div>
 
-                    <div className="z-10 mt-6 text-center">
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.8 }}
-                        >
-                            <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tighter text-slate-50 premium-text-glow">
-                                Welcome Back,<br />
-                                <span className="magical-text italic glitter-text text-emerald-400 text-3xl md:text-4xl">Guardian.</span>
-                            </h1>
-                            <p className="text-slate-400 text-xs max-w-xs font-semibold leading-relaxed mx-auto italic opacity-70 mb-4 px-6">
-                                "Thanks to this Elderly Guardian AI, I quickly found peace of mind! Easy to navigate and excellent results. Highly recommended!"
-                            </p>
-                            <div className="flex flex-col items-center">
-                                <div className="w-8 h-8 bg-white/5 rounded-full border border-white/10 flex items-center justify-center mb-1 overflow-hidden">
-                                    <Heart className="w-4 h-4 text-emerald-400 fill-emerald-400/20" />
-                                </div>
-                                <span className="text-[10px] font-black text-white">Elderly Guardian</span>
-                                <span className="text-[8px] text-slate-500 uppercase tracking-widest font-black">AI Protection System</span>
+                            {/* Condensed Feature Cards */}
+                            <div className="grid grid-cols-2 gap-4 w-full">
+                                {[
+                                    { icon: <Activity className="w-5 h-5 text-emerald-400" />, title: 'AI Health', desc: 'Real-time' },
+                                    { icon: <Clock className="w-5 h-5 text-blue-400" />, title: 'Reminders', desc: 'Smart alerts' },
+                                    { icon: <MapPin className="w-5 h-5 text-purple-400" />, title: 'Live GPS', desc: 'Safety net' },
+                                    { icon: <Lock className="w-5 h-5 text-amber-400" />, title: 'Secure', desc: 'Encrypted' }
+                                ].map((feat, i) => (
+                                    <div key={i} className="flex items-center gap-3 p-3 bg-white/[0.03] border border-white/5 rounded-2xl backdrop-blur-sm">
+                                        <div className="p-2 bg-white/5 rounded-xl">{feat.icon}</div>
+                                        <div className="text-left">
+                                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">{feat.title}</h4>
+                                            <p className="text-[10px] text-slate-500 font-medium">{feat.desc}</p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        </motion.div>
+
+                            {/* Trust Badge */}
+                            <div className="flex items-center justify-center gap-3 py-2 px-4 bg-emerald-500/5 border border-emerald-500/10 rounded-full w-fit mx-auto">
+                                <UserCheck className="w-4 h-4 text-emerald-400" />
+                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">2,847+ Active Guardians</span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col items-center">
+                            <motion.div
+                                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                                transition={{ duration: 3, repeat: Infinity }}
+                                className="p-2 bg-emerald-500/20 rounded-full border border-emerald-500/30 mb-2"
+                            >
+                                <Heart className="w-5 h-5 text-emerald-400" />
+                            </motion.div>
+                            <span className="text-[10px] font-black text-slate-500 tracking-[0.3em] uppercase">Elderly Guardian AI</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Right Side: Authentication Form */}
-                <div className="flex-1 flex items-center justify-center p-0 bg-slate-950 relative overflow-hidden grid-dots-bg">
+                {/* Right Side: Auth Form (Forced Single Page) */}
+                <div className="flex-1 flex items-center justify-center p-0 bg-slate-950 relative overflow-hidden grid-dots-bg h-full">
+                    {/* Background Visuals */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-transparent to-emerald-600/5 pointer-events-none" />
                     <motion.div
                         className="lens-flare"
                         animate={{ x: mousePos.x - window.innerWidth / 2 - 100, y: mousePos.y - 100 }}
                         transition={{ type: "spring", damping: 20, stiffness: 100 }}
                     />
 
-                    <motion.div
-                        initial={{ opacity: 0, x: 30 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.5 }}
-                        className="w-full h-full md:max-w-md space-y-2 p-6 md:p-8 flex flex-col justify-center auth-card-glass rounded-none md:rounded-l-[4rem] relative z-10 shadow-auth overflow-hidden"
-                    >
-                        <AnimatePresence mode="wait">
+                    {/* Toast Notification */}
+                    <AnimatePresence>
+                        {authToast && (
                             <motion.div
-                                key={authMode}
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                transition={{ duration: 0.3 }}
-                                className="w-full"
+                                initial={{ opacity: 0, y: -30 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                className={`fixed top-6 z-50 px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-xl border flex items-center gap-3 ${
+                                    authToast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                                    authToast.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                                    'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                                }`}
                             >
-                                <form onSubmit={async (e) => {
-                                    e.preventDefault();
-                                    setAuthError('');
-                                    setAuthSuccess('');
-                                    const res = authMode === 'signin' ? await login(authForm.email, authForm.password) : await signup(authForm);
-                                    if (!res.success) {
-                                        setAuthError(res.error || 'Failed');
-                                    } else if (authMode === 'signup') {
-                                        setAuthMode('signin');
-                                        setAuthSuccess('Account created! Please sign in.');
-                                    }
-                                }} className="space-y-4">
-                                    <h2 className="text-3xl font-black text-white tracking-tight mb-8 mt-4 premium-text-glow">
-                                        {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
-                                    </h2>
+                                <span>{authToast.icon || '💡'}</span>
+                                <span className="text-xs font-bold">{authToast.message}</span>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
-                                    <div className="space-y-4">
-                                        {authMode === 'signup' && (
-                                            <input
-                                                type="text"
-                                                placeholder="Full Name"
-                                                className="w-full auth-input-refined"
-                                                value={authForm.name}
-                                                onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
-                                            />
-                                        )}
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black uppercase text-slate-500 ml-4 tracking-widest">Email Address</label>
-                                            <input
-                                                type="email"
-                                                placeholder="email@address.com"
-                                                className="w-full auth-input-refined"
-                                                value={authForm.email}
-                                                onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-black uppercase text-slate-500 ml-4 tracking-widest">Password</label>
-                                            <div className="relative group">
-                                                <input
-                                                    type={showPassword ? "text" : "password"}
-                                                    placeholder="Enter password"
-                                                    className="w-full auth-input-refined pr-12"
-                                                    value={authForm.password}
-                                                    onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowPassword(!showPassword)}
-                                                    className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                                                >
-                                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                                </button>
+                    <div className="w-full h-full max-w-md flex flex-col justify-center px-8 relative z-10">
+                        <div className="w-full space-y-6">
+                            <div className="text-center md:text-left">
+                                <h2 className="text-3xl font-black text-white tracking-tight premium-text-glow leading-tight">
+                                    {authMode === 'signin' ? 'Welcome Back' : 'Create Account'}
+                                </h2>
+                                <p className="text-slate-500 text-xs mt-2 uppercase tracking-wide font-bold">
+                                    {authMode === 'signin' ? 'Secure Login Access' : 'Join the Guardian Network'}
+                                </p>
+                            </div>
+
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={authMode}
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                >
+                                    <form 
+                                        onSubmit={async (e) => {
+                                            e.preventDefault();
+                                            setAuthError('');
+                                            const res = authMode === 'signin' ? await login(authForm.email, authForm.password) : await signup(authForm);
+                                            if (!res.success) setAuthError(res.error || 'Failed');
+                                            else if (authMode === 'signup') setAuthMode('signin');
+                                        }}
+                                        className={`space-y-4 ${authMode === 'signup' ? 'max-h-[50vh] overflow-y-auto scrollbar-refined pr-2 py-2' : ''}`}
+                                    >
+                                        {/* Error Alert */}
+                                        {authError && (
+                                            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-[10px] font-bold text-center">
+                                                {authError}
                                             </div>
-                                        </div>
-                                    </div>
+                                        )}
 
-                                    {authError && (
-                                        <div className="text-red-400 text-xs font-bold text-center px-4 mt-2 bg-red-500/10 py-2 rounded-xl">
-                                            {authError}
-                                        </div>
-                                    )}
+                                        {/* Common Inputs */}
+                                        <div className="space-y-3">
+                                            {authMode === 'signup' && (
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-black uppercase text-slate-500 ml-4">Full Name</label>
+                                                    <input type="text" placeholder="John Doe" className="w-full auth-input-refined" value={authForm.name} onChange={e => setAuthForm({...authForm, name: e.target.value})} />
+                                                </div>
+                                            )}
+                                            
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black uppercase text-slate-500 ml-4">Email</label>
+                                                <div className="relative">
+                                                    <input type="email" placeholder="you@example.com" className="w-full auth-input-refined" value={authForm.email} onChange={e => { setAuthForm({...authForm, email: e.target.value}); if(authMode==='signup') validateEmail(e.target.value); }} />
+                                                    {authMode === 'signup' && emailValid?.checking && <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full" />}
+                                                </div>
+                                            </div>
 
-                                    {authSuccess && (
-                                        <div className="text-emerald-400 text-xs font-bold text-center px-4 mt-2 bg-emerald-500/10 py-2 rounded-xl">
-                                            {authSuccess}
-                                        </div>
-                                    )}
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black uppercase text-slate-500 ml-4">Password</label>
+                                                <div className="relative">
+                                                    <input type={showPassword ? "text" : "password"} placeholder="••••••••" className="w-full auth-input-refined" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
+                                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
+                                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
+                                            </div>
 
+                                            {/* Extra Fields (Signup Only) - Scrollable */}
+                                            {authMode === 'signup' && (
+                                                <>
+                                                    <div className="space-y-1">
+                                                        <label className="text-[10px] font-black uppercase text-slate-500 ml-4">Emergency Phone</label>
+                                                        <input type="tel" placeholder="+1 (555) 000-0000" className="w-full auth-input-refined" value={authForm.phone} onChange={e => setAuthForm({...authForm, phone: e.target.value})} />
+                                                    </div>
+                                                    <div className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+                                                        <div className="flex items-center gap-2">
+                                                            <Fingerprint className="w-4 h-4 text-purple-400" />
+                                                            <span className="text-[10px] font-bold text-slate-400">Enable 2FA Protection</span>
+                                                        </div>
+                                                        <button type="button" onClick={() => setEnable2FA(!enable2FA)} className={`w-10 h-5 rounded-full relative transition-colors ${enable2FA ? 'bg-purple-500' : 'bg-slate-800'}`}>
+                                                            <motion.div animate={{ x: enable2FA ? 22 : 2 }} className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-lg" />
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black uppercase tracking-[0.2em] text-[10px] shadow-xl shadow-blue-500/20 transition-all">
+                                            {authMode === 'signin' ? 'Sign In' : 'Create Account'}
+                                        </motion.button>
+                                    </form>
+                                </motion.div>
+                            </AnimatePresence>
+
+                            {/* Divider & Socials */}
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-px flex-1 bg-white/5" />
+                                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Secure Connect</span>
+                                    <div className="h-px flex-1 bg-white/5" />
+                                </div>
+
+                                <div className="grid grid-cols-4 gap-2">
+                                    {['Google', 'GitHub', 'Apple', 'LinkedIn'].map(p => (
+                                        <button key={p} onClick={() => handleSocialLogin(p)} className="p-3 bg-white/[0.03] border border-white/10 rounded-2xl flex items-center justify-center hover:bg-white/[0.08] hover:border-white/20 transition-all group">
+                                            {OAUTH_PROVIDERS[p].icon}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Guest Login - Dynamic Logic */}
+                                {authMode === 'signin' && (
                                     <motion.button
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        type="submit"
-                                        className="w-full py-5 text-sm text-white rounded-full font-black shadow-2xl flex items-center justify-center gap-3 mt-6 transition-all magic-button-premium premium-glow-border"
+                                        onClick={async () => {
+                                            setSocialLoading('guest');
+                                            showAuthToast('Launching demo...', 'info', '🚀');
+                                            const res = await guestLogin();
+                                            setSocialLoading(null);
+                                            if (!res.success) showAuthToast(res.error, 'error', '❌');
+                                        }}
+                                        disabled={socialLoading === 'guest'}
+                                        className="w-full py-3 border border-dashed border-slate-700 rounded-full text-slate-500 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
                                     >
-                                        {authMode === 'signin' ? 'Sign In' : 'Create Account'}
-                                        <ArrowRight className="w-5 h-5" />
+                                        {socialLoading === 'guest' ? <div className="animate-spin w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full" /> : <Zap className="w-4 h-4" />}
+                                        Start Quick Demo
                                     </motion.button>
-                                </form>
+                                )}
 
-                                <div className="cyber-divider text-center my-6">Or {authMode === 'signin' ? 'sign in' : 'sign up'} with</div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button className="social-btn group">
-                                        <img src="https://www.google.com/favicon.ico" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" alt="G" />
-                                        <span className="text-xs">Google</span>
-                                    </button>
-                                    <button className="social-btn group">
-                                        <Users className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-all" />
-                                        <span className="text-xs">LinkedIn</span>
-                                    </button>
-                                </div>
-
-                                <motion.button
-                                    whileHover={{ y: -2 }}
-                                    onClick={() => {
-                                        setAuthMode(authMode === 'signin' ? 'signup' : 'signin');
-                                        setAuthError('');
-                                        setAuthSuccess('');
-                                    }}
-                                    className="w-full text-center text-slate-400 hover:text-white font-black uppercase tracking-[0.2em] text-[10px] transition-all py-6 mt-4 opacity-70 hover:opacity-100"
+                                <button
+                                    onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+                                    className="w-full text-center text-slate-500 hover:text-white text-[10px] font-black uppercase tracking-widest transition-colors py-2"
                                 >
-                                    {authMode === 'signin' ? "Don't have an account? Create now" : "Already a guardian? Sign In"}
-                                </motion.button>
-                            </motion.div>
-                        </AnimatePresence>
-                    </motion.div>
+                                    {authMode === 'signin' ? "Need an account? Sign Up" : "Back to Sign In"}
+                                </button>
+                            </div>
+
+                            {/* Security Footer */}
+                            <div className="flex items-center justify-center gap-2 pt-4 opacity-30">
+                                <Shield className="w-3 h-3 text-emerald-400" />
+                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">End-to-End Encrypted · HIPAA Compliant</span>
+                            </div>
+
+                            {/* Developer Recognition */}
+                            <div className="mt-8 flex flex-col items-center justify-center border-t border-slate-800/50 pt-8 pb-4 opacity-60 hover:opacity-100 transition-opacity">
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-2">Developed By</p>
+                                <h3 className="text-3xl font-black text-white tracking-tight leading-none mb-1">PMR</h3>
+                                <p className="text-xs font-bold text-purple-500 tracking-widest uppercase mb-4 drop-shadow-md">With AI</p>
+                                
+                                <p className="text-xs font-semibold text-slate-400 tracking-wide mb-5">B.Tech (AI & DS) @ <span className="text-slate-300">MTIEAT</span> (3-1)</p>
+                                
+                                <div className="flex flex-col w-full border-y border-slate-800/50">
+                                    <div className="flex items-center justify-center gap-2 py-3 border-b border-slate-800/30">
+                                        <div className="w-4 h-3 bg-slate-300 rounded-[2px] flex items-center justify-center opacity-80"><div className="w-0 h-0 border-l-[4px] border-l-transparent border-t-[4px] border-t-white border-r-[4px] border-r-transparent" style={{marginTop: '-2px'}}></div></div>
+                                        <a href="mailto:venoxvenom00000@gmail.com" className="text-xs font-bold text-blue-500 hover:text-blue-400 transition-colors">venoxvenom00000@gmail.com</a>
+                                    </div>
+                                    <div className="flex items-center justify-center gap-2 py-3">
+                                        <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0788.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z" /></svg>
+                                        <span className="text-xs font-bold text-indigo-500 tracking-wide">Discord: casmonox</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Debug Overlay */}
-                <div className="fixed bottom-2 right-2 z-50 text-[10px] text-slate-600 bg-black/80 px-2 py-1 rounded opacity-50 hover:opacity-100 pointer-events-none">
-                    API: {API_BASE_URL}
-                </div>
+                {/* OAuth Multi-step Modal */}
+                {oauthModal && (
+                    <OAuthModal
+                        provider={oauthModal}
+                        onClose={() => { setOauthModal(null); setSocialLoading(null); }}
+                        onSuccess={handleOAuthSuccess}
+                    />
+                )}
             </div>
         );
     }

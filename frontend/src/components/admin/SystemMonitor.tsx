@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Cpu, HardDrive, Database, Wifi, Clock, Pill, Activity, Users, Calendar, Heart, RefreshCw, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { API_BASE_URL } from '../../config';
@@ -67,8 +67,8 @@ const SystemMonitor: React.FC = () => {
             setError(null);
             cpuHistory.current = [...cpuHistory.current.slice(1), data.cpu.percent];
             setLastRefresh(new Date());
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Unknown error occurred');
         } finally {
             setIsLoading(false);
         }

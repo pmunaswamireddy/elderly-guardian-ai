@@ -42,6 +42,7 @@ ocr_debug.json
 ocr_debug.log
 frontend/public/avatars/
 backend/uploads/
+backend/certs/
 
 # Temp / debug scripts
 backend/check_*.py

@@ -1,11 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Search, UserX, UserCheck, Trash2, Loader2, Mail, Phone, Fingerprint, ShieldAlert, Cpu } from 'lucide-react';
+import { Search, UserCheck, Trash2, Loader2, Mail, Phone, Fingerprint, ShieldAlert, Cpu } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { API_BASE_URL } from '../../config';
 
+interface IUser {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
+    role: string;
+    banned_until: string | null;
+    created_at: string;
+}
+
 const UserManagement: React.FC = () => {
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<IUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -16,7 +26,7 @@ const UserManagement: React.FC = () => {
                 setUsers(data.users || []);
                 setIsLoading(false);
             })
-            .catch(err => {
+            .catch((err: unknown) => {
                 console.error("Error fetching users:", err);
                 setIsLoading(false);
             });

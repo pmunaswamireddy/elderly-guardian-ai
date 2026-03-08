@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X, Shield, Activity, Pill, Heart, Zap, Sparkles, Brain,
-    Mic, MapPin, Bell, MessageSquare, Users, Loader2, RefreshCw,
+    Mic, MapPin, Bell, MessageSquare, Loader2, RefreshCw,
     Sun, CheckCircle
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';

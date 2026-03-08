@@ -96,13 +96,11 @@ async def call_ai_agent(messages, temperature=0.1, timeout=30.0):
     """
     import asyncio
 
-    # ── Tier 1: Gemini 2.0 Flash (FREE · 1500 req/day · fast + smart) ──
+    # ── Tier 1: Gemini Direct (FREE · 1500 req/day) ──
     if genai_client:
         gemini_models = [
             "gemini-2.0-flash",
             "gemini-2.0-flash-lite",
-            "gemini-1.5-flash-latest",
-            "gemini-1.5-pro-latest",
         ]
         gemini_prompt = ""
         for msg in messages:
@@ -124,14 +122,15 @@ async def call_ai_agent(messages, temperature=0.1, timeout=30.0):
                 print(f"[AI Tier-1] {model_name} failed: {err[:120]}")
                 continue
 
-    # ── Tier 2 & 3: OpenRouter Free Models (DeepSeek R1 + Qwen 2.5) ──
+    # ── Tier 2 & 3: OpenRouter Free Models (Resilient Mix) ──
     if OPENROUTER_API_KEY:
         openrouter_models = [
-            "deepseek/deepseek-r1:free",            # #1 reasoning model, 100% free
-            "qwen/qwen-2.5-72b-instruct:free",      # Strong multilingual (great for Hindi/Telugu)
-            "google/gemini-2.0-flash-exp:free",     # Gemini Flash via OpenRouter
-            "meta-llama/llama-3.3-70b-instruct:free", # Llama 3.3 70B free
-            "mistralai/mistral-7b-instruct:free",   # Mistral 7B free
+            "deepseek/deepseek-r1-0528:free",         # Reasoning (Free)
+            "qwen/qwen3-coder:free",                # Powerful Coding/Reasoning (Free)
+            "google/gemma-3-27b-it:free",            # Large Context (Free)
+            "meta-llama/llama-3.3-70b-instruct:free", # Stable Fallback (Free)
+            "liquid/lfm-2.5-1.2b-instruct:free",     # Fast (Free)
+            "nvidia/nemotron-nano-12b-v2-vl:free",  # Alternative (Free)
         ]
         for or_model in openrouter_models:
             try:
@@ -152,16 +151,17 @@ async def call_ai_agent(messages, temperature=0.1, timeout=30.0):
                         print(f"[AI ✓] OpenRouter {or_model} success.")
                         return data
                 else:
-                    print(f"[AI Tier-2] {or_model} HTTP {response.status_code}")
+                    print(f"[AI Tier-2] {or_model} HTTP {response.status_code} - {response.text[:100]}")
             except Exception as e:
-                print(f"[AI Tier-2] {or_model} error: {e}")
+                print(f"[AI Tier-2] {or_model} error: {str(e)[:100]}")
                 continue
 
-    # ── Tier 4: Groq Llama 3.3-70B (FREE · fast inference) ──
+    # ── Tier 4: Groq Models (Fast & Free) ──
     groq_models = [
         "llama-3.3-70b-versatile",
-        "llama-3.1-70b-versatile",
+        "llama-3-70b-8192",
         "mixtral-8x7b-32768",
+        "llama-3.1-8b-instant",
     ]
     for gm in groq_models:
         try:
@@ -390,6 +390,154 @@ async def login(user: UserLogin):
         if 'password' in auth_user: del auth_user['password']
         return {"success": True, "user": auth_user}
     raise HTTPException(status_code=401, detail="Invalid credentials")
+
+@app.post("/api/guest-login")
+async def guest_login():
+    """Endpoint for creating a temporary guest login session"""
+    try:
+        new_guest = db_ops.create_guest_user()
+        if new_guest:
+            if 'password' in new_guest: del new_guest['password']
+            return {"success": True, "user": new_guest}
+        raise HTTPException(status_code=500, detail="Failed to create guest session")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Email Validation ---
+DISPOSABLE_DOMAINS = {
+    "tempmail.com","throwaway.email","guerrillamail.com","mailinator.com","yopmail.com",
+    "10minutemail.com","trashmail.com","fakeinbox.com","sharklasers.com","guerrillamailblock.com",
+    "grr.la","dispostable.com","maildrop.cc","temp-mail.org","tempail.com","mohmal.com",
+    "getnada.com","emailondeck.com","mintemail.com","discard.email","burnermail.io",
+    "tempr.email","mailnesia.com","spamgourmet.com","mytemp.email","tmpmail.org","tmpmail.net",
+    "harakirimail.com","tmail.ws","emailfake.com","crazymailing.com","mailsac.com",
+    "inboxbear.com","mailcatch.com","trashmail.net","wegwerfmail.de","spamfree24.org"
+}
+
+class EmailValidation(BaseModel):
+    email: str
+
+@app.post("/api/validate-email")
+async def validate_email(data: EmailValidation):
+    import re as re_mod
+    email = data.email.strip().lower()
+    # Basic format check
+    if not re_mod.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        return {"valid": False, "reason": "Invalid email format"}
+    domain = email.split('@')[1]
+    # Disposable domain check
+    if domain in DISPOSABLE_DOMAINS:
+        return {"valid": False, "reason": "Disposable/temporary email addresses are not allowed"}
+    # Check if email already exists
+    _sb = getattr(db_ops, 'supabase', None)
+    if _sb:
+        try:
+            existing = _sb.table("users").select("id").eq("email", email).execute()
+            if existing.data:
+                return {"valid": False, "reason": "Email already registered"}
+        except: pass
+    # DNS MX record check
+    try:
+        import subprocess
+        result = subprocess.run(["nslookup", "-type=mx", domain], capture_output=True, text=True, timeout=5)
+        if "mail exchanger" not in result.stdout.lower() and "mx preference" not in result.stdout.lower():
+            return {"valid": False, "reason": "Email domain does not accept emails"}
+    except:
+        pass  # If DNS check fails, allow it (could be network issue)
+    return {"valid": True, "reason": "Email looks valid"}
+
+# --- Username Management ---
+class UsernameUpdate(BaseModel):
+    username: str
+
+@app.get("/api/check-username/{username}")
+async def check_username(username: str):
+    _sb = getattr(db_ops, 'supabase', None)
+    if not _sb:
+        return {"available": False, "reason": "Database unavailable"}
+    if len(username) < 3:
+        return {"available": False, "reason": "Username must be at least 3 characters"}
+    if len(username) > 20:
+        return {"available": False, "reason": "Username must be 20 characters or fewer"}
+    if not re.match(r'^[a-zA-Z0-9_]+$', username):
+        return {"available": False, "reason": "Only letters, numbers, and underscores allowed"}
+    try:
+        existing = _sb.table("users").select("id").eq("name", username).execute()
+        if existing.data:
+            return {"available": False, "reason": "Username already taken"}
+        return {"available": True, "reason": "Username is available"}
+    except Exception as e:
+        return {"available": False, "reason": str(e)}
+
+@app.put("/api/users/{user_id}/username")
+async def update_username(user_id: int, data: UsernameUpdate):
+    _sb = getattr(db_ops, 'supabase', None)
+    if not _sb:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    username = data.username.strip()
+    if len(username) < 3 or not re.match(r'^[a-zA-Z0-9_]+$', username):
+        raise HTTPException(status_code=400, detail="Invalid username format")
+    try:
+        existing = _sb.table("users").select("id").eq("name", username).execute()
+        if existing.data and existing.data[0]["id"] != user_id:
+            raise HTTPException(status_code=409, detail="Username already taken")
+        _sb.table("users").update({"name": username}).eq("id", user_id).execute()
+        return {"success": True, "username": username}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class PasswordUpdate(BaseModel):
+    password: str
+
+@app.put("/api/users/{user_id}/password")
+async def update_password(user_id: int, data: PasswordUpdate):
+    if not db_ops.update_user_password(user_id, data.password):
+        raise HTTPException(status_code=500, detail="Failed to update password")
+    return {"success": True}
+
+# --- OAuth Login (simulated provider data) ---
+class OAuthLogin(BaseModel):
+    provider: str
+    provider_email: str
+    provider_name: str
+    provider_avatar: Optional[str] = None
+
+@app.post("/api/oauth-login")
+async def oauth_login(data: OAuthLogin):
+    """Create or login a user from OAuth provider data"""
+    _sb = getattr(db_ops, 'supabase', None)
+    if not _sb:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    try:
+        # Check if user exists by email
+        existing = _sb.table("users").select("*").eq("email", data.provider_email).execute()
+        if existing.data:
+            user = existing.data[0]
+            if 'password' in user: del user['password']
+            return {"success": True, "user": user, "is_new": False}
+        # Create new user with OAuth data
+        import secrets
+        temp_password = secrets.token_hex(16)  # Random password for OAuth users
+        new_user = db_ops.create_user(
+            name=data.provider_name,
+            email=data.provider_email,
+            password=temp_password,
+            phone=""
+        )
+        if new_user:
+            if 'password' in new_user: del new_user['password']
+            # Update avatar if provided
+            if data.provider_avatar:
+                _sb.table("users").update({"avatar_url": data.provider_avatar}).eq("id", new_user["id"]).execute()
+                new_user["avatar_url"] = data.provider_avatar
+            return {"success": True, "user": new_user, "is_new": True}
+        raise HTTPException(status_code=400, detail="Failed to create OAuth user")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Settings
 class UserSettings(BaseModel):
@@ -2025,4 +2173,14 @@ async def update_location(update: LocationUpdate):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8007)
+    cert_dir = os.path.join(os.path.dirname(__file__), "certs")
+    cert_file = os.path.join(cert_dir, "cert.pem")
+    key_file = os.path.join(cert_dir, "key.pem")
+
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        print("[SERVER] Starting with HTTPS (self-signed cert)")
+        uvicorn.run(app, host="0.0.0.0", port=8007, ssl_certfile=cert_file, ssl_keyfile=key_file)
+    else:
+        print("[SERVER] No SSL certs found. Starting with HTTP. Run 'python generate_cert.py' to enable HTTPS.")
+        uvicorn.run(app, host="0.0.0.0", port=8007)
+

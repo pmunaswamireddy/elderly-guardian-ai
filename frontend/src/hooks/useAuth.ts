@@ -66,6 +66,27 @@ export function useAuth() {
         return () => clearInterval(interval);
     }, [user?.id, user?.role]);
 
+    const guestLogin = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/guest-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success) {
+                setUser(data.user);
+                setIsLoggedIn(true);
+                setStoredUserId(data.user?.id);
+                return { success: true };
+            }
+            return { success: false, error: data.detail || 'Guest login failed' };
+        } catch (err: unknown) {
+            console.error("Guest login failed:", err);
+            const errorMessage = err instanceof Error ? err.message : 'Connection error';
+            return { success: false, error: errorMessage };
+        }
+    };
+
     const login = async (email: string, password: string) => {
         try {
             const res = await fetch(`${API_BASE_URL}/api/login`, {
@@ -81,13 +102,14 @@ export function useAuth() {
                 return { success: true };
             }
             return { success: false, error: data.detail || 'Login failed' };
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Login failed:", err);
-            return { success: false, error: err.message || 'Connection error' };
+            const errorMessage = err instanceof Error ? err.message : 'Connection error';
+            return { success: false, error: errorMessage };
         }
     };
 
-    const signup = async (formData: any) => {
+    const signup = async (formData: unknown) => {
         try {
             const res = await fetch(`${API_BASE_URL}/api/signup`, {
                 method: 'POST',
@@ -99,9 +121,10 @@ export function useAuth() {
                 return { success: true };
             }
             return { success: false, error: data.detail || 'Signup failed' };
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Signup failed:", err);
-            return { success: false, error: err.message || 'Connection error' };
+            const errorMessage = err instanceof Error ? err.message : 'Connection error';
+            return { success: false, error: errorMessage };
         }
     };
 
@@ -127,6 +150,28 @@ export function useAuth() {
         }
     };
 
+    const oauthLogin = async (provider: string, email: string, name: string, avatar?: string) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/oauth-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, provider_email: email, provider_name: name, provider_avatar: avatar })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setUser(data.user);
+                setIsLoggedIn(true);
+                setStoredUserId(data.user?.id);
+                return { success: true, is_new: data.is_new };
+            }
+            return { success: false, error: data.detail || 'OAuth login failed' };
+        } catch (err: unknown) {
+            console.error("OAuth login failed:", err);
+            const errorMessage = err instanceof Error ? err.message : 'Connection error';
+            return { success: false, error: errorMessage };
+        }
+    };
+
     return {
         user,
         isLoggedIn,
@@ -134,7 +179,9 @@ export function useAuth() {
         login,
         signup,
         logout,
+        oauthLogin,
+        guestLogin,
         updateUserSettings,
-        refreshUser: () => user?.id && fetchUserSettings(user.id)
+        refreshUser: () => user && fetchUserSettings(user.id)
     };
 }

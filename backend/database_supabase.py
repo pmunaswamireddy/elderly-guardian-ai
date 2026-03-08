@@ -47,6 +47,19 @@ class SupabaseDB:
 
 db = SupabaseDB()
 
+# Module-level wrappers for SupabaseDB instance methods
+def get_history(user_id: int, days: int = 60):
+    return db.get_history(user_id, days)
+
+def delete_history_item(history_id: int):
+    try:
+        if not supabase: return False
+        supabase.table("medicine_history").delete().eq("id", history_id).execute()
+        return True
+    except Exception as e:
+        print(f"[Supabase ERROR] delete_history_item: {e}")
+        return False
+
 # --- User Management ---
 
 def authenticate_user(email: str, password: str):
@@ -78,7 +91,21 @@ def get_user_by_id(user_id: int):
         print(f"[Supabase ERROR] get_user_by_id: {e}")
         return None
 
-def create_user(name: str, email: str, password: str, phone: str = None, role: str = "user"):
+def create_guest_user() -> Optional[Dict]:
+    """Create a temporary guest user with unique identifiers"""
+    import uuid
+    guest_id = str(uuid.uuid4())[:8]
+    guest_name = f"Guest_{guest_id}"
+    guest_email = f"guest_{guest_id}@elderlyguardian.com"
+    guest_password = "guestpassword123"
+    
+    user = create_user(guest_name, guest_email, guest_password, role="guest")
+    if user:
+        print(f"[Supabase] Created temporary guest: {guest_name}")
+        return user
+    return None
+
+def create_user(name: str, email: str, password: str, phone: str = None, role: str = "user") -> Optional[Dict]:
     if not supabase: return None
     try:
         res = supabase.table("users").insert({
@@ -116,6 +143,15 @@ def update_admin_credentials(user_id: int, email: str, password: str) -> bool:
         return len(res.data) > 0
     except Exception as e:
         print(f"[Supabase ERROR] update_admin_credentials: {e}")
+        return False
+
+def update_user_password(user_id: int, password: str) -> bool:
+    if not supabase: return False
+    try:
+        res = supabase.table("users").update({"password": password}).eq("id", user_id).execute()
+        return len(res.data) > 0
+    except Exception as e:
+        print(f"[Supabase ERROR] update_user_password: {e}")
         return False
 
 def ban_user(user_id: int, days: int, reason: str):
@@ -452,7 +488,7 @@ def unban_user_from_channel(user_id: int, channel_id: str):
 
 def get_channel_bans_list(channel_id: str):
     if not supabase: return []
-    res = supabase.table("channel_bans").select("*, users(name)").eq("channel_id", channel_id).execute()
+    res = supabase.table("channel_bans").select("*, users!channel_bans_user_id_fkey(name)").eq("channel_id", channel_id).execute()
     for r in (res.data or []): r['user_name'] = r.get('users', {}).get('name', 'Unknown')
     return res.data or []
 

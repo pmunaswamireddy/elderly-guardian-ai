@@ -18,14 +18,15 @@ Start-Sleep -Seconds 2
 # Start Backend in a new terminal
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; python main.py" -WindowStyle Normal
 
-# Start Frontend in a new terminal
+# Start Frontend in a new terminal (HTTPS enabled)
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev -- --port 3000" -WindowStyle Normal
 
 Write-Host "Services are starting in separate windows." -ForegroundColor Green
 Write-Host "Backend: http://localhost:8007" -ForegroundColor Cyan
-Write-Host "Frontend: http://localhost:3000" -ForegroundColor Cyan
+Write-Host "Frontend: https://localhost:3000 (HTTPS Enabled)" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Services are now running in separate windows." -ForegroundColor White
 Write-Host "You can now log in or sign up without fetch errors." -ForegroundColor Green
 Write-Host "-------------------------------" -ForegroundColor White
-Write-Host "Network Access: Use your Local IP (shown in the frontend terminal window)." -ForegroundColor Yellow
+Write-Host "Network Access (HTTPS): Use https://<Your-Local-IP>:3000" -ForegroundColor Yellow
+Write-Host "NOTE: Your browser will show a certificate warning. Click 'Advanced' > 'Proceed' to continue." -ForegroundColor DarkYellow
