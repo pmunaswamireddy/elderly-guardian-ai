@@ -38,7 +38,7 @@ matplotlib==3.8.2
 seaborn==0.13.0
 
 # HTTP & API
-httpx==0.25.2
+httpx==0.24.1
 aiofiles==23.2.1
 
 # Database (Optional)
