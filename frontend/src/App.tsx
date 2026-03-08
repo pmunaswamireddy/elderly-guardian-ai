@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from './utils/cn';
-import { ArrowRight, Eye, EyeOff, Activity, Calendar, BarChart2, Pill, Camera, Heart, Shield, Users, LogOut, Sun, Moon, Settings, Bell, PhoneCall, BarChart3, Database, Monitor, MessageSquare, Info, X, Fingerprint, Lock, Smartphone, CheckCircle2, Github, Zap, Clock, MapPin, UserCheck, History } from 'lucide-react';
+import { Eye, EyeOff, Activity, Calendar, BarChart2, Pill, Camera, Heart, Shield, Users, LogOut, Sun, Moon, Settings, Bell, PhoneCall, BarChart3, Database, Monitor, MessageSquare, Info, X, Fingerprint, Lock, Github, Zap, Clock, MapPin, UserCheck, History } from 'lucide-react';
 import { API_BASE_URL } from './config';
 import type { User, Medicine, VitalsRecord, Appointment, AnalysisResult } from './types';
 
@@ -40,43 +40,32 @@ import { InfoModal } from './components/InfoModal';
 import { ChatHistoryModal } from './components/ChatHistoryModal';
 import type { ChatMessage } from './components/ChatHistoryModal';
 import OAuthModal from './components/OAuthModal';
+import { ProfileCompletionView } from './components/auth/ProfileCompletionView';
+import { supabase } from './supabaseClient';
 
-const OAUTH_PROVIDERS: Record<string, { name: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-    google: {
-        name: 'Google',
-        color: 'text-white',
-        bgColor: 'bg-[#4285F4]',
-        icon: <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-    },
-    github: {
-        name: 'GitHub',
-        color: 'text-white',
-        bgColor: 'bg-[#24292F]',
-        icon: <Github className="w-5 h-5" />
-    }
-};
 
 const ParticleBackground: React.FC = () => (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
+    <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
         {[...Array(20)].map((_, i) => (
             <motion.div
                 key={i}
-                className="absolute w-1 h-1 bg-blue-500 rounded-full"
-                initial={{ 
-                    x: Math.random() * 100 + "%", 
-                    y: Math.random() * 100 + "%",
-                    scale: Math.random() * 2,
-                    opacity: Math.random()
+                className="absolute w-1 h-1 bg-white rounded-full"
+                initial={{
+                    x: Math.random() * 1920,
+                    y: Math.random() * 1080,
+                    opacity: Math.random(),
+                    scale: Math.random() * 0.5 + 0.5
                 }}
-                animate={{ 
-                    y: ["-10%", "110%"],
-                    opacity: [0, 0.5, 0]
+                animate={{
+                    y: [null, Math.random() * -100 - 50],
+                    opacity: [0, 1, 0],
+                    scale: [0, 1.2, 0]
                 }}
-                transition={{ 
-                    duration: Math.random() * 10 + 10, 
-                    repeat: Infinity, 
-                    ease: "linear",
-                    delay: Math.random() * 10
+                transition={{
+                    duration: Math.random() * 3 + 2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: Math.random() * 5
                 }}
             />
         ))}
@@ -97,6 +86,7 @@ const App: React.FC = () => {
     const [showNotifications, setShowNotifications] = useState(false);
     const [showNetworkHelp, setShowNetworkHelp] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
+    const [showDeveloperInfo, setShowDeveloperInfo] = useState(false);
     const [editingVitals, setEditingVitals] = useState<VitalsRecord | null>(null);
     const [editingMed, setEditingMed] = useState<Medicine | null>(null);
     const [showPinModal, setShowPinModal] = useState(false);
@@ -107,14 +97,8 @@ const App: React.FC = () => {
     const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
     const [authForm, setAuthForm] = useState({ name: '', email: '', password: '', phone: '' });
     const [authError, setAuthError] = useState('');
-    const [authSuccess, setAuthSuccess] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [rememberMe, setRememberMe] = useState(false);
-    const [showForgotPassword, setShowForgotPassword] = useState(false);
-    const [forgotEmail, setForgotEmail] = useState('');
-    const [forgotSent, setForgotSent] = useState(false);
     const [enable2FA, setEnable2FA] = useState(false);
-    const [agreeTerms, setAgreeTerms] = useState(false);
     const [authToast, setAuthToast] = useState<{ message: string; type: 'info' | 'success' | 'error'; icon?: string } | null>(null);
     const [socialLoading, setSocialLoading] = useState<string | null>(null);
     const [oauthModal, setOauthModal] = useState<{ id: string; name: string; color: string; bgColor: string; icon: React.ReactNode; email: string; displayName: string; avatar?: string } | null>(null);
@@ -480,33 +464,6 @@ const App: React.FC = () => {
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, [isLoggedIn]);
 
-    const ParticleBackground = () => (
-        <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
-            {[...Array(20)].map((_, i) => (
-                <motion.div
-                    key={i}
-                    className="absolute w-1 h-1 bg-white rounded-full"
-                    initial={{
-                        x: Math.random() * window.innerWidth,
-                        y: Math.random() * window.innerHeight,
-                        opacity: Math.random(),
-                        scale: Math.random() * 0.5 + 0.5
-                    }}
-                    animate={{
-                        y: [null, Math.random() * -100 - 50],
-                        opacity: [0, 1, 0],
-                        scale: [0, 1.2, 0]
-                    }}
-                    transition={{
-                        duration: Math.random() * 3 + 2,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        delay: Math.random() * 5
-                    }}
-                />
-            ))}
-        </div>
-    );
 
     // Helper: show a toast notification on the auth page
     const showAuthToast = (message: string, type: 'info' | 'success' | 'error' = 'info', icon?: string) => {
@@ -518,20 +475,70 @@ const App: React.FC = () => {
     const OAUTH_PROVIDERS: Record<string, { name: string; color: string; bgColor: string; icon: React.ReactNode; email: string; displayName: string }> = {
         Google: { name: 'Google', color: '#4285F4', bgColor: 'rgba(66,133,244,0.15)', icon: <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G" />, email: 'user@gmail.com', displayName: 'Google User' },
         GitHub: { name: 'GitHub', color: '#333', bgColor: 'rgba(255,255,255,0.08)', icon: <Github className="w-5 h-5 text-white" />, email: 'dev@github.com', displayName: 'GitHub Developer' },
-        Apple: { name: 'Apple', color: '#555', bgColor: 'rgba(255,255,255,0.06)', icon: <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>, email: 'user@icloud.com', displayName: 'Apple User' },
-        LinkedIn: { name: 'LinkedIn', color: '#0077B5', bgColor: 'rgba(0,119,181,0.15)', icon: <Users className="w-5 h-5 text-blue-400" />, email: 'professional@linkedin.com', displayName: 'LinkedIn Professional' },
     };
 
-    // Open OAuth modal for a provider
-    const handleSocialLogin = (provider: string) => {
-        const config = OAUTH_PROVIDERS[provider];
-        if (!config) return;
-        setSocialLoading(provider);
+    // Open Supabase OAuth for a provider
+    const handleSocialLogin = async (providerName: string) => {
+        setSocialLoading(providerName);
         setAuthError('');
-        setOauthModal({ id: provider, ...config });
+        
+        try {
+            const providerMap: Record<string, 'google' | 'github' | 'apple' | 'linkedin_oidc'> = {
+                Google: 'google',
+                GitHub: 'github',
+                Apple: 'apple',
+                LinkedIn: 'linkedin_oidc'
+            };
+            const provider = providerMap[providerName];
+            if (!provider) throw new Error("Unsupported provider");
+
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: provider,
+                options: {
+                    redirectTo: `${window.location.origin}`
+                }
+            });
+            if (error) throw error;
+        } catch (err: unknown) {
+            console.error(err);
+            setSocialLoading(null);
+            showAuthToast('OAuth connection failed', 'error', '❌');
+        }
     };
 
-    // Handle OAuth success callback
+    // Listen for Supabase redirect / login success
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user && !isLoggedIn) {
+                const subUser = session.user;
+                const email = subUser.email || '';
+                const name = subUser.user_metadata?.full_name || subUser.user_metadata?.name || email.split('@')[0];
+                const avatar = subUser.user_metadata?.avatar_url;
+                const provider = subUser.app_metadata?.provider || 'supabase';
+                
+                setSocialLoading(provider);
+                showAuthToast('Authenticating with backend...', 'info', '🔑');
+                const result = await oauthLogin(provider, email, name, avatar);
+                setSocialLoading(null);
+                
+                if (result.success) {
+                    if (result.is_new) {
+                        setIsCompletingProfile(true);
+                        setSetupForm(prev => ({ ...prev, username: name.toLowerCase().replace(/\s+/g, '_') }));
+                        showAuthToast('Complete your profile to finish setup!', 'info', '✨');
+                    } else {
+                        showAuthToast(`Welcome back!`, 'success', '✅');
+                    }
+                } else {
+                    showAuthToast(result.error || 'Login failed', 'error', '❌');
+                    await supabase.auth.signOut();
+                }
+            }
+        });
+        return () => subscription.unsubscribe();
+    }, [isLoggedIn]);
+
+    // Handle dummy OAuth success callback (kept as fallback if needed)
     const handleOAuthSuccess = async (data: { provider: string; email: string; name: string; avatar?: string }) => {
         setOauthModal(null);
         setSocialLoading(data.provider);
@@ -634,15 +641,6 @@ const App: React.FC = () => {
         }, 500);
     };
 
-    // Simulate biometric authentication
-    const handleBiometricLogin = async () => {
-        setSocialLoading('biometric');
-        setAuthError('');
-        showAuthToast('Scanning biometrics...', 'info', '👆');
-        await new Promise(r => setTimeout(r, 2200));
-        setSocialLoading(null);
-        showAuthToast('Biometric hardware not detected. Please use email login.', 'error', '⚠️');
-    };
 
     if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
 
@@ -667,28 +665,28 @@ const App: React.FC = () => {
 
                         <div className="text-center space-y-6 max-w-lg">
                             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                                <h1 className="text-4xl lg:text-5xl font-black tracking-tighter text-slate-50 premium-text-glow leading-tight">
+                                <h1 className="text-5xl lg:text-6xl font-black tracking-tighter text-slate-50 premium-text-glow leading-tight mb-2">
                                     Welcome Back,<br />
-                                    <span className="magical-text italic glitter-text text-emerald-400 text-5xl lg:text-7xl">Guardian.</span>
+                                    <span className="magical-text italic glitter-text text-emerald-400 text-6xl lg:text-7xl">Guardian.</span>
                                 </h1>
-                                <p className="text-slate-400 text-sm mt-4 font-semibold italic opacity-80">
+                                <p className="text-slate-400 text-base mt-6 font-semibold italic opacity-80 max-w-md mx-auto">
                                     "Peace of mind is just a login away. Your safety is our priority."
                                 </p>
                             </motion.div>
 
                             {/* Condensed Feature Cards */}
-                            <div className="grid grid-cols-2 gap-4 w-full">
+                            <div className="grid grid-cols-2 gap-5 w-full mt-4">
                                 {[
-                                    { icon: <Activity className="w-5 h-5 text-emerald-400" />, title: 'AI Health', desc: 'Real-time' },
-                                    { icon: <Clock className="w-5 h-5 text-blue-400" />, title: 'Reminders', desc: 'Smart alerts' },
-                                    { icon: <MapPin className="w-5 h-5 text-purple-400" />, title: 'Live GPS', desc: 'Safety net' },
-                                    { icon: <Lock className="w-5 h-5 text-amber-400" />, title: 'Secure', desc: 'Encrypted' }
+                                    { icon: <Activity className="w-6 h-6 text-emerald-400" />, title: 'AI Health', desc: 'Real-time' },
+                                    { icon: <Clock className="w-6 h-6 text-blue-400" />, title: 'Reminders', desc: 'Smart alerts' },
+                                    { icon: <MapPin className="w-6 h-6 text-purple-400" />, title: 'Live GPS', desc: 'Safety net' },
+                                    { icon: <Lock className="w-6 h-6 text-amber-400" />, title: 'Secure', desc: 'Encrypted' }
                                 ].map((feat, i) => (
-                                    <div key={i} className="flex items-center gap-3 p-3 bg-white/[0.03] border border-white/5 rounded-2xl backdrop-blur-sm">
-                                        <div className="p-2 bg-white/5 rounded-xl">{feat.icon}</div>
+                                    <div key={i} className="flex items-center gap-4 p-4 bg-white/[0.03] border border-white/5 rounded-2xl backdrop-blur-sm hover:bg-white/[0.05] transition-colors">
+                                        <div className="p-3 bg-white/5 rounded-xl">{feat.icon}</div>
                                         <div className="text-left">
-                                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">{feat.title}</h4>
-                                            <p className="text-[10px] text-slate-500 font-medium">{feat.desc}</p>
+                                            <h4 className="text-sm font-bold text-white uppercase tracking-wider">{feat.title}</h4>
+                                            <p className="text-xs text-slate-500 font-medium">{feat.desc}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -743,28 +741,63 @@ const App: React.FC = () => {
                         )}
                     </AnimatePresence>
 
-                    <div className="w-full h-full max-w-md flex flex-col justify-center px-8 relative z-10">
-                        <div className="w-full space-y-6">
-                            <div className="text-center md:text-left">
-                                <h2 className="text-3xl font-black text-white tracking-tight premium-text-glow leading-tight">
+                    <div className="w-full h-full max-w-xl xl:max-w-2xl flex flex-col justify-center px-8 md:px-16 pt-8 pb-4 relative z-10">
+                        <div className="w-full space-y-5 xl:space-y-6">
+                            <div className="text-center md:text-left mb-6 xl:mb-8">
+                                <h2 className="text-4xl xl:text-5xl font-black text-white tracking-tight premium-text-glow leading-tight">
                                     {authMode === 'signin' ? 'Welcome Back' : 'Create Account'}
                                 </h2>
-                                <p className="text-slate-500 text-xs mt-2 uppercase tracking-wide font-bold">
+                                <p className="text-slate-500 text-sm mt-3 uppercase tracking-widest font-bold">
                                     {authMode === 'signin' ? 'Secure Login Access' : 'Join the Guardian Network'}
                                 </p>
                             </div>
 
                             <AnimatePresence mode="wait">
-                                <motion.div
-                                    key={authMode}
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
-                                >
+                                {isCompletingProfile ? (
+                                    <motion.div
+                                        key="complete-profile"
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -20 }}
+                                    >
+                                        <ProfileCompletionView
+                                            username={setupForm.username}
+                                            setUsername={(v) => setSetupForm({ ...setupForm, username: v })}
+                                            password={setupForm.password}
+                                            setPassword={(v) => setSetupForm({ ...setupForm, password: v })}
+                                            confirmPassword={setupForm.confirmPassword}
+                                            setConfirmPassword={(v) => setSetupForm({ ...setupForm, confirmPassword: v })}
+                                            onSubmit={handleCompleteProfile}
+                                            loading={socialLoading === 'complete-profile'}
+                                            usernameStatus={usernameStatus}
+                                            onCheckUsername={checkUsernameAvailability}
+                                        />
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        key={authMode}
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20 }}
+                                    >
                                     <form 
                                         onSubmit={async (e) => {
                                             e.preventDefault();
                                             setAuthError('');
+                                            
+                                            // Enforce validation
+                                            if (authMode === 'signin') {
+                                                if (!authForm.email.trim() || !authForm.password.trim()) {
+                                                    setAuthError('Please enter both email and password');
+                                                    return;
+                                                }
+                                            } else {
+                                                if (!authForm.email.trim() || !authForm.password.trim() || !authForm.name.trim()) {
+                                                    setAuthError('Please fill in all required fields');
+                                                    return;
+                                                }
+                                            }
+
                                             const res = authMode === 'signin' ? await login(authForm.email, authForm.password) : await signup(authForm);
                                             if (!res.success) setAuthError(res.error || 'Failed');
                                             else if (authMode === 'signup') setAuthMode('signin');
@@ -777,41 +810,58 @@ const App: React.FC = () => {
                                                 {authError}
                                             </div>
                                         )}
-
-                                        {/* Common Inputs */}
-                                        <div className="space-y-3">
-                                            {authMode === 'signup' && (
-                                                <div className="space-y-1">
-                                                    <label className="text-[10px] font-black uppercase text-slate-500 ml-4">Full Name</label>
-                                                    <input type="text" placeholder="John Doe" className="w-full auth-input-refined" value={authForm.name} onChange={e => setAuthForm({...authForm, name: e.target.value})} />
+                                        <div className="space-y-4 xl:space-y-6">
+                                            {authMode === 'signin' ? (
+                                                <div className="space-y-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-black uppercase text-slate-500 ml-5 opacity-80 tracking-wider">Email</label>
+                                                        <div className="relative">
+                                                            <input type="email" placeholder="you@example.com" className="w-full auth-input-refined py-3.5 text-sm" value={authForm.email} onChange={e => { setAuthForm({...authForm, email: e.target.value}); }} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-black uppercase text-slate-500 ml-5 opacity-80 tracking-wider">Password</label>
+                                                        <div className="relative">
+                                                            <input type={showPassword ? "text" : "password"} placeholder="••••••••" className="w-full auth-input-refined py-3.5 text-sm" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
+                                                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors scale-110">
+                                                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-black uppercase text-slate-500 ml-5 opacity-80 tracking-wider">Full Name</label>
+                                                        <input type="text" placeholder="John Doe" className="w-full auth-input-refined py-3.5 text-sm" value={authForm.name} onChange={e => setAuthForm({...authForm, name: e.target.value})} />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-black uppercase text-slate-500 ml-5 opacity-80 tracking-wider">Email</label>
+                                                        <div className="relative">
+                                                            <input type="email" placeholder="you@example.com" className="w-full auth-input-refined py-3.5 text-sm" value={authForm.email} onChange={e => { setAuthForm({...authForm, email: e.target.value}); validateEmail(e.target.value); }} />
+                                                            {emailValid?.checking && <div className="absolute right-5 top-1/2 -translate-y-1/2 animate-spin w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full" />}
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-black uppercase text-slate-500 ml-5 opacity-80 tracking-wider">Emergency Phone</label>
+                                                        <div className="relative">
+                                                            <input type="tel" placeholder="+1 (555) 000-0000" className="w-full auth-input-refined py-3.5 text-sm" value={authForm.phone} onChange={e => setAuthForm({...authForm, phone: e.target.value})} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-xs font-black uppercase text-slate-500 ml-5 opacity-80 tracking-wider">Password</label>
+                                                        <div className="relative">
+                                                            <input type={showPassword ? "text" : "password"} placeholder="••••••••" className="w-full auth-input-refined py-3.5 text-sm" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
+                                                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors scale-110">
+                                                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
-                                            
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-black uppercase text-slate-500 ml-4">Email</label>
-                                                <div className="relative">
-                                                    <input type="email" placeholder="you@example.com" className="w-full auth-input-refined" value={authForm.email} onChange={e => { setAuthForm({...authForm, email: e.target.value}); if(authMode==='signup') validateEmail(e.target.value); }} />
-                                                    {authMode === 'signup' && emailValid?.checking && <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full" />}
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-black uppercase text-slate-500 ml-4">Password</label>
-                                                <div className="relative">
-                                                    <input type={showPassword ? "text" : "password"} placeholder="••••••••" className="w-full auth-input-refined" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
-                                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
-                                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                                    </button>
-                                                </div>
-                                            </div>
-
                                             {/* Extra Fields (Signup Only) - Scrollable */}
                                             {authMode === 'signup' && (
                                                 <>
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] font-black uppercase text-slate-500 ml-4">Emergency Phone</label>
-                                                        <input type="tel" placeholder="+1 (555) 000-0000" className="w-full auth-input-refined" value={authForm.phone} onChange={e => setAuthForm({...authForm, phone: e.target.value})} />
-                                                    </div>
                                                     <div className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-xl">
                                                         <div className="flex items-center gap-2">
                                                             <Fingerprint className="w-4 h-4 text-purple-400" />
@@ -825,11 +875,50 @@ const App: React.FC = () => {
                                             )}
                                         </div>
 
-                                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black uppercase tracking-[0.2em] text-[10px] shadow-xl shadow-blue-500/20 transition-all">
-                                            {authMode === 'signin' ? 'Sign In' : 'Create Account'}
-                                        </motion.button>
+                                            {authMode === 'signin' && (
+                                                <div className="w-full flex justify-end -mt-2 pr-4 z-40 relative">
+                                                    <div className="h-4" />
+                                                </div>
+                                            )}
+
+                                        <div className="grid grid-cols-2 gap-4 mt-4">
+                                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-blue-500/20 transition-all">
+                                                {authMode === 'signin' ? 'Sign In' : 'Create Account'}
+                                            </motion.button>
+
+                                            {authMode === 'signin' ? (
+                                                <motion.button
+                                                    type="button"
+                                                    whileHover={{ scale: 1.02 }}
+                                                    whileTap={{ scale: 0.98 }}
+                                                    onClick={async () => {
+                                                        setSocialLoading('guest');
+                                                        showAuthToast('Launching demo...', 'info', '🚀');
+                                                        const res = await guestLogin();
+                                                        setSocialLoading(null);
+                                                        if (!res.success) showAuthToast(res.error, 'error', '❌');
+                                                    }}
+                                                    disabled={socialLoading === 'guest'}
+                                                    className="w-full py-4 border border-dashed border-slate-700 rounded-full text-slate-400 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                                                >
+                                                    {socialLoading === 'guest' ? <div className="animate-spin w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full" /> : <Zap className="w-4 h-4" />}
+                                                    Quick Demo
+                                                </motion.button>
+                                            ) : (
+                                                <motion.button
+                                                    type="button"
+                                                    whileHover={{ scale: 1.02 }}
+                                                    whileTap={{ scale: 0.98 }}
+                                                    onClick={() => setAuthMode('signin')}
+                                                    className="w-full py-4 border border-dashed border-slate-700 rounded-full text-slate-400 hover:text-blue-400 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                                                >
+                                                    Back to Login
+                                                </motion.button>
+                                            )}
+                                        </div>
                                     </form>
                                 </motion.div>
+                                )}
                             </AnimatePresence>
 
                             {/* Divider & Socials */}
@@ -840,66 +929,41 @@ const App: React.FC = () => {
                                     <div className="h-px flex-1 bg-white/5" />
                                 </div>
 
-                                <div className="grid grid-cols-4 gap-2">
-                                    {['Google', 'GitHub', 'Apple', 'LinkedIn'].map(p => (
-                                        <button key={p} onClick={() => handleSocialLogin(p)} className="p-3 bg-white/[0.03] border border-white/10 rounded-2xl flex items-center justify-center hover:bg-white/[0.08] hover:border-white/20 transition-all group">
-                                            {OAUTH_PROVIDERS[p].icon}
+                                <div className="grid grid-cols-2 gap-4">
+                                    {['Google', 'GitHub'].map(p => (
+                                        <button key={p} onClick={() => handleSocialLogin(p)} className="p-3.5 bg-white/[0.04] border border-white/10 rounded-2xl flex items-center justify-center hover:bg-white/[0.1] hover:border-white/20 transition-all gap-4 group">
+                                            <div className="scale-110">
+                                                {OAUTH_PROVIDERS[p].icon}
+                                            </div>
+                                            <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors">{p}</span>
                                         </button>
                                     ))}
                                 </div>
 
-                                {/* Guest Login - Dynamic Logic */}
                                 {authMode === 'signin' && (
-                                    <motion.button
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={async () => {
-                                            setSocialLoading('guest');
-                                            showAuthToast('Launching demo...', 'info', '🚀');
-                                            const res = await guestLogin();
-                                            setSocialLoading(null);
-                                            if (!res.success) showAuthToast(res.error, 'error', '❌');
-                                        }}
-                                        disabled={socialLoading === 'guest'}
-                                        className="w-full py-3 border border-dashed border-slate-700 rounded-full text-slate-500 hover:text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                                    <button
+                                        onClick={() => setAuthMode('signup')}
+                                        className="w-full text-center text-slate-500 hover:text-white text-xs font-black uppercase tracking-widest transition-colors py-3 mt-2"
                                     >
-                                        {socialLoading === 'guest' ? <div className="animate-spin w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full" /> : <Zap className="w-4 h-4" />}
-                                        Start Quick Demo
-                                    </motion.button>
+                                        Need an account? Sign Up
+                                    </button>
                                 )}
-
-                                <button
-                                    onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
-                                    className="w-full text-center text-slate-500 hover:text-white text-[10px] font-black uppercase tracking-widest transition-colors py-2"
-                                >
-                                    {authMode === 'signin' ? "Need an account? Sign Up" : "Back to Sign In"}
-                                </button>
                             </div>
 
                             {/* Security Footer */}
-                            <div className="flex items-center justify-center gap-2 pt-4 opacity-30">
+                            <div className="flex items-center justify-center gap-2 pt-2 opacity-30">
                                 <Shield className="w-3 h-3 text-emerald-400" />
                                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">End-to-End Encrypted · HIPAA Compliant</span>
                             </div>
 
-                            {/* Developer Recognition */}
-                            <div className="mt-8 flex flex-col items-center justify-center border-t border-slate-800/50 pt-8 pb-4 opacity-60 hover:opacity-100 transition-opacity">
-                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-2">Developed By</p>
-                                <h3 className="text-3xl font-black text-white tracking-tight leading-none mb-1">PMR</h3>
-                                <p className="text-xs font-bold text-purple-500 tracking-widest uppercase mb-4 drop-shadow-md">With AI</p>
-                                
-                                <p className="text-xs font-semibold text-slate-400 tracking-wide mb-5">B.Tech (AI & DS) @ <span className="text-slate-300">MTIEAT</span> (3-1)</p>
-                                
-                                <div className="flex flex-col w-full border-y border-slate-800/50">
-                                    <div className="flex items-center justify-center gap-2 py-3 border-b border-slate-800/30">
-                                        <div className="w-4 h-3 bg-slate-300 rounded-[2px] flex items-center justify-center opacity-80"><div className="w-0 h-0 border-l-[4px] border-l-transparent border-t-[4px] border-t-white border-r-[4px] border-r-transparent" style={{marginTop: '-2px'}}></div></div>
-                                        <a href="mailto:venoxvenom00000@gmail.com" className="text-xs font-bold text-blue-500 hover:text-blue-400 transition-colors">venoxvenom00000@gmail.com</a>
-                                    </div>
-                                    <div className="flex items-center justify-center gap-2 py-3">
-                                        <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0788.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z" /></svg>
-                                        <span className="text-xs font-bold text-indigo-500 tracking-wide">Discord: casmonox</span>
-                                    </div>
-                                </div>
+                            {/* Developer Recognition - Modal Trigger */}
+                            <div className="mt-4 flex flex-col items-center justify-center border-t border-slate-800/50 pt-4 pb-2">
+                                <button 
+                                    onClick={() => setShowDeveloperInfo(true)}
+                                    className="flex items-center gap-3 px-6 py-2.5 border-2 border-blue-600/60 rounded-full hover:bg-blue-600/10 hover:border-blue-500 transition-all group shadow-lg shadow-blue-900/20"
+                                >
+                                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-slate-300 group-hover:text-blue-200 transition-colors">Developed By PMR</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -913,6 +977,58 @@ const App: React.FC = () => {
                         onSuccess={handleOAuthSuccess}
                     />
                 )}
+                
+                {/* Developer Info Modal */}
+                <AnimatePresence>
+                    {showDeveloperInfo && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-[#020617] border border-slate-700/50 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl relative"
+                            >
+                                <button 
+                                    onClick={() => setShowDeveloperInfo(false)}
+                                    className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white bg-slate-800/50 hover:bg-slate-700/50 rounded-full transition-all z-10"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+
+                                <div className="p-8 pb-8 flex flex-col items-center text-center">
+                                    <div className="mb-6 relative">
+                                        <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 rounded-full" />
+                                        <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl flex items-center justify-center shadow-xl relative text-white font-black text-3xl border border-white/10 tracking-tighter">
+                                            AI
+                                        </div>
+                                    </div>
+                                    
+                                    <h3 className="text-3xl font-black text-white tracking-tight leading-none mb-1">PMR</h3>
+                                    <p className="text-sm font-bold text-purple-500 tracking-widest uppercase mb-6 drop-shadow-md">With AI</p>
+                                    
+                                    <p className="text-xs sm:text-sm font-semibold text-slate-400 tracking-wide mb-8">B.Tech (AI & DS) @ <span className="text-slate-300">MTIEAT</span> (3-1)</p>
+                                    
+                                    <div className="w-full space-y-3">
+                                        <div className="flex items-center gap-4 p-4 bg-slate-800/30 border border-slate-700/50 hover:border-blue-500/50 hover:bg-blue-500/10 transition-all rounded-2xl group cursor-pointer" onClick={() => window.open('mailto:venoxvenom00000@gmail.com')}>
+                                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                                                <div className="w-5 h-3.5 bg-blue-400 rounded-[2px] flex items-center justify-center opacity-80"><div className="w-0 h-0 border-l-[5px] border-l-transparent border-t-[5px] border-t-[#020617] group-hover:border-t-blue-900 border-r-[5px] border-r-transparent" style={{marginTop: '-2px'}}></div></div>
+                                            </div>
+                                            <span className="text-xs sm:text-sm font-bold text-slate-300 group-hover:text-white transition-colors truncate">venoxvenom00000@gmail.com</span>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-4 p-4 bg-slate-800/30 border border-slate-700/50 hover:border-indigo-500/50 hover:bg-indigo-500/10 transition-all rounded-2xl group cursor-pointer" onClick={() => {}}>
+                                            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                                                <svg className="w-5 h-5 text-indigo-400" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0788.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z" /></svg>
+                                            </div>
+                                            <span className="text-xs sm:text-sm font-bold text-slate-300 group-hover:text-white transition-colors truncate">Discord: casmonox</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
             </div>
         );
     }

@@ -385,6 +385,8 @@ async def signup(user: UserRegister):
 
 @app.post("/api/login")
 async def login(user: UserLogin):
+    if not user.name_or_email.strip() or not user.password.strip():
+        raise HTTPException(status_code=400, detail="Email and password are required")
     auth_user = db_ops.authenticate_user(user.name_or_email, user.password)
     if auth_user:
         if 'password' in auth_user: del auth_user['password']
