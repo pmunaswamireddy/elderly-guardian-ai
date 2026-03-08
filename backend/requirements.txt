@@ -1,11 +1,11 @@
 # FastAPI Core
-fastapi
-uvicorn[standard]
-python-multipart
+fastapi==0.135.1
+uvicorn[standard]==0.41.0
+python-multipart==0.0.22
 
 # Data Validation & Serialization
-pydantic
-pydantic-settings
+pydantic==2.12.5
+pydantic-settings==2.13.1
 
 # CORS & Security
 python-jose[cryptography]==3.3.0
@@ -37,7 +37,7 @@ matplotlib==3.8.2
 seaborn==0.13.0
 
 # HTTP & API
-httpx
+httpx==0.28.1
 aiofiles==23.2.1
 
 # Database (Optional)
@@ -67,14 +67,23 @@ python-dateutil==2.8.2
 pytz==2023.3
 
 # Supabase
-supabase
+supabase==2.28.0
 
 # Utilities
 click==8.1.7
 rich==13.7.0
 tqdm==4.66.1
-google-genai
-fuzzywuzzy
-edge-tts
-groq
-mistralai
+google-genai==1.66.0
+fuzzywuzzy==0.18.0
+edge-tts==6.1.12
+groq==0.13.1
+mistralai==1.4.0
+
+# Pinning complex sub-dependencies to prevent pip backtracking loops
+opentelemetry-api==1.40.0
+opentelemetry-sdk==1.40.0
+opentelemetry-exporter-otlp-proto-http==1.40.0
+opentelemetry-exporter-otlp-proto-common==1.40.0
+opentelemetry-proto==1.40.0
+libclang==18.1.1
+joblib==1.5.3
