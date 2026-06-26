@@ -1,10 +1,78 @@
 import sqlite3
 import json
+import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
 
 # Simple SQLite Database - Lightweight Alternative to SQLAlchemy
 is_connected = True
+
+TURSO_URL = os.getenv("TURSO_DATABASE_URL")
+TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+
+if TURSO_URL and TURSO_TOKEN:
+    import libsql_client
+
+    class TursoRow(dict):
+        def __init__(self, cols, values):
+            super().__init__(zip(cols, values))
+            self._values = tuple(values)
+        def __getitem__(self, key):
+            if isinstance(key, int):
+                return self._values[key]
+            return super().__getitem__(key)
+        def keys(self):
+            return super().keys()
+
+    class TursoCursor:
+        def __init__(self, client, connection):
+            self.client = client
+            self.connection = connection
+            self.description = None
+            self._fetchall_data = []
+            self._fetchone_data = None
+            self.lastrowid = None
+
+        def execute(self, sql, params=()):
+            result = self.client.execute(sql, params)
+            cols = []
+            if hasattr(result, "columns") and result.columns:
+                self.description = [(col,) for col in result.columns]
+                cols = result.columns
+            else:
+                self.description = None
+            
+            if hasattr(result, "rows"):
+                if self.connection.row_factory:
+                    self._fetchall_data = [TursoRow(cols, row) for row in result.rows]
+                else:
+                    self._fetchall_data = [tuple(row) for row in result.rows]
+            else:
+                self._fetchall_data = []
+                
+            self._fetchone_data = iter(self._fetchall_data)
+            self.lastrowid = getattr(result, "last_insert_rowid", None)
+            return self
+
+        def fetchall(self):
+            return self._fetchall_data
+
+        def fetchone(self):
+            try:
+                return next(self._fetchone_data)
+            except StopIteration:
+                return None
+
+    class TursoConnection:
+        def __init__(self, url, token):
+            self.client = libsql_client.create_client_sync(url, auth_token=token)
+            self.row_factory = None
+        def cursor(self):
+            return TursoCursor(self.client, self)
+        def commit(self):
+            pass
+        def close(self):
+            self.client.close()
 
 class SimpleDB:
     def __init__(self, db_path: str = "elderly_guardian.db"):
@@ -12,6 +80,8 @@ class SimpleDB:
         self.init_database()
     
     def get_connection(self):
+        if TURSO_URL and TURSO_TOKEN:
+            return TursoConnection(TURSO_URL, TURSO_TOKEN)
         return sqlite3.connect(self.db_path)
     
     def init_database(self):

@@ -44,6 +44,7 @@ aiofiles==23.2.1
 # Database (Optional)
 sqlalchemy==2.0.23
 alembic==1.13.0
+libsql-client==0.3.1
 
 # Caching (Optional)
 redis==5.0.1
