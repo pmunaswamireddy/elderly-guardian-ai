@@ -366,15 +366,6 @@ async def health_check():
     }
 
 # --- Medicine History Endpoints ---
-@app.get("/medicines/history")
-async def get_med_history(user_id: int, days: int = 60):
-    return {"success": True, "history": db_ops.get_history(user_id, days)}
-
-@app.delete("/medicines/history/{history_id}")
-async def delete_med_history(history_id: int):
-    success = db_ops.delete_history_item(history_id)
-    return {"success": success}
-
 # Authentication
 @app.post("/api/signup")
 async def signup(user: UserRegister):
