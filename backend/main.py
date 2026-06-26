@@ -1524,7 +1524,7 @@ async def get_admin_monitor_endpoint():
 
 # Community Chat & Admin
 @app.get("/api/channels")
-async def get_channels_endpoint():
+def get_channels_endpoint():
     channels = db_ops.get_channels_with_meta()
     return {"channels": channels}
 
@@ -1629,7 +1629,7 @@ async def get_user_role_endpoint(channel_id: str, user_id: int):
     return {"role": role, "is_moderator": role in ['owner', 'moderator']}
 
 @app.get("/api/chat/history")
-async def get_chat_history_endpoint(channel: str = "general"):
+def get_chat_history_endpoint(channel: str = "general"):
     history = db_ops.get_chat_history(channel)
     return {"history": history}
 
@@ -1642,7 +1642,7 @@ class ChatMessage(BaseModel):
     attachment_type: str = None
 
 @app.post("/api/chat/send")
-async def send_chat_message_endpoint(msg: ChatMessage):
+def send_chat_message_endpoint(msg: ChatMessage):
     # Permission checks (simplified for parity across drivers)
     user = db_ops.get_user_by_id(msg.user_id)
     if not user: raise HTTPException(status_code=404, detail="User not found")
